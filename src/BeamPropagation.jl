@@ -1,5 +1,5 @@
 #計算に関係ないパッケージ
-using Pkg 
+using Pkg
 
 include("parameter.jl")
 
@@ -15,16 +15,18 @@ param_range = struct_range(xwidth = 100, ywidth = 100, zwidth = 100,trange = 50)
 param_step = struct_step(xstep = 0.1, ystep = 0.1, zstep = 0.05)
 #材料情報
 param_material = struct_materiarl(nb = 1.5, Δn0 = 0.01, τ = 0.1,α = 0)
+param_mode = struct_vortex_mode()
 
 println("計算環境")
 versioninfo()
 Pkg.status()
+
 println("計算条件")
 @show param_range
 @show param_step
 @show param_material
+@show param_mode
 
-#P
 @time function returnPades(T::Int16,N::Int16)
 end
 
