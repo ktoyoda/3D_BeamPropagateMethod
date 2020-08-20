@@ -12,15 +12,25 @@ nm = 10^(-9.0m)
 
 # 実験条件####################
 @with_kw struct struct_range
-    xwidth::Int16 = 100
-    ywidth::Int16 = 100
-    zwidth::Int16 = 100
-    trange::Int16 = 50
+    # セルの距離(um)
+    xwidth::Int16 = 100um
+    ywidth::Int16 = 100um
+    zwidth::Int16 = 100um
+    trange::Int16 = 50um
 end
 @with_kw struct struct_step
-    xstep::Float16 = 0.1
-    ystep::Float16 = 0.1
-    zstep::Float16 = 0.1
+    # セルのステップ（um
+    xstep::Float16 = 0.1um
+    ystep::Float16 = 0.1um
+    zstep::Float16 = 0.1um
+    tstep::Float16 = 0.1um
+end
+
+struct struct_N
+    Nx::Int
+    Ny::Int
+    Nz::Int
+    Nt::Int
 end
 @with_kw struct struct_materiarl
     nb::Float16 =1.5
