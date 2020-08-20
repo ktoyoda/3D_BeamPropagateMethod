@@ -12,16 +12,19 @@ using Plots
 param_range = struct_range(xwidth = 100, ywidth = 100, zwidth = 100,trange = 50)
 #計算ステップ
 param_step = struct_step(xstep = 0.1, ystep = 0.1, zstep = 0.05)
-Nx = parse(Int,(param_range.xwidth / param_step.xstep))
-Ny = parse(Int,(param_range.ywidth / param_step.ystep))
-Nz = parse(Int,(param_range.zwidth / param_step.zstep))
-Nt = parse(Int,(param_range.trange / param_step.tstep))
+Nx = Int(param_range.xwidth / param_step.xstep)
+Ny = Int(param_range.ywidth / param_step.ystep)
+Nz = Int(param_range.zwidth / param_step.zstep)
+Nt = Int(param_range.trange / param_step.tstep)
 param_N = struct_N(Nx,Ny,Nz,Nt)
-
 
 #材料情報
 param_material = struct_materiarl(nb = 1.5, Δn0 = 0.01, τ = 0.1,α = 0)
-param_mode = struct_vortex_mode()
+param_mode = struct_vortex_mode(l=1, p=1)
+param_beam = struct_beam_param()
+
+#ビーム情報
+param_beam = struct_beam
 
 println("計算環境")
 versioninfo()
@@ -45,18 +48,22 @@ end
 @time function calcStep2()
 end
 
-@time function showMode()
-end
-
 @time function retN()
 end
 
-@time function boundary_set(u,k)
-
+# 試験的。BPMのモード測定を使う
+@time function showMode()
 end
 
+
+@time function boundary_set(u,k)
+end
+
+function initial_set(M::struct_vortex_mode,B::struct_beam,)
+    
+end
 function main()
     #セル個数
     F0 = zeros(param_N.Nx,param_N.Ny)
-    
+    F0  = initial_set(param_mode,param_beam)
 end
