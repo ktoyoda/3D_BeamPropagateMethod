@@ -6,6 +6,7 @@ include("parameter.jl")
 #計算に使うパッケージ
 using LinearAlgebra
 using Plots
+using KTOptical
 
 # 計算条件###################
 #計算レンジ
@@ -21,7 +22,7 @@ param_N = struct_N(Nx,Ny,Nz,Nt)
 #材料情報
 param_material = struct_materiarl(nb = 1.5, Δn0 = 0.01, τ = 0.1,α = 0)
 param_mode = struct_vortex_mode(l=1, p=1)
-param_beam = struct_beam()
+param_beam = struct_beam(w = 3um, U0 = 100, wavelength = 1.06um)
 
 #ビーム情報
 param_beam = struct_beam
@@ -36,7 +37,9 @@ println("計算条件")
 @show param_N
 @show param_material
 @show param_mode
+@show param_beam
 
+println("//////////////////////////////")
 @time function returnPades(T::Int16,N::Int16)
 end
 
@@ -78,13 +81,22 @@ end
 @time function boundary_set(u,k,array)
 end
 
-function initial_set(M::struct_vortex_mode,B::struct_beam,)
-    
+function initial_set(M, B ,F0)
+    KTOptical.setParam(B.w, 0, B.wavelength)
+    x = range(-param_range.xwidth/2, param_range.xwidth/2 ,step = param_step.xstep)
+    y = range(-param_range.ywidth/2, param_range.ywidth/2 ,step = param_step.ystep)
+
+    E = LG_E.(B.l, B.p,x,y')
+
+    F_temp = E
+    plot(x,y,F_temp)
+
 end
+
 function main()
     #セル個数
     F0 = zeros(param_N.Nx, param_N.Ny, param_N.Nz)
-    F0[:,:,0]  = initial_set(param_mode,param_beam)
+    initial_set(param_mode, param_beam, F0)
     F_result = zeros(param_N.Nx,param_N.Ny,param_N.Nz,param_N.Nt)
     #F_k_1stは現在のF_k
     #F_k_2ndは更新されたF_k
@@ -98,6 +110,6 @@ function main()
     F_k_1st = calcStep1(F_k_1st,F_k_2nd)
     F_k_1st = calcStep1(F_k_1st,F_k_2nd)
     #push(F_k_1st )
-
-
 end
+
+main()

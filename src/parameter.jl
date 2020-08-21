@@ -13,17 +13,17 @@ nm = 10^(-9.0m)
 # 実験条件####################
 @with_kw struct struct_range
     # セルの距離(um)
-    xwidth::Float32 = 100um
-    ywidth::Float32 = 100um
-    zwidth::Float32 = 100um
-    trange::Float32 = 10
+    xwidth::Float64 = 100um
+    ywidth::Float64 = 100um
+    zwidth::Float64 = 100um
+    trange::Float64 = 10
 end
 @with_kw struct struct_step
     # セルのステップ（um
-    xstep::Float32 = 0.1um
-    ystep::Float32 = 0.1um
-    zstep::Float32 = 0.1um
-    tstep::Float32 = 0.1
+    xstep::Float64 = 0.1um
+    ystep::Float64 = 0.1um
+    zstep::Float64 = 0.1um
+    tstep::Float64 = 0.1
 end
 
 struct struct_N
@@ -33,15 +33,15 @@ struct struct_N
     Nt::Int32
 end
 @with_kw struct struct_materiarl
-    nb::Float16 =1.5
-    Δn0::Float16 = 0.03
-    τ::Float16 = 0.1
-    α::Float16 = 0
+    nb::Float64 =1.5
+    Δn0::Float64 = 0.03
+    τ::Float64 = 0.1
+    α::Float64 = 0
 end
 @with_kw struct struct_beam
-    w::Float16 = 3um
-    U0::Float16 = 100
-    wavelength::Float16 = 1.06um
+    w::Float64 = 3um
+    U0::Float64 = 100
+    wavelength::Float64 = 1.06um
 end
 @with_kw struct struct_gauss_mode
     m::Int16 = 1
