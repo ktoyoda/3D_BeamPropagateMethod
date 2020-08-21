@@ -45,17 +45,11 @@ end
 
     for i in range(Nx)
         for j in range(Ny)
-<<<<<<< HEAD
             continue
         end
     end
     boundary_set(u,k,F_kp12)
-=======
-            
-        end
-    end
-    boundary_set(F_kp12)
->>>>>>> 553b1f734a59bd075a3c44afc74b4fec5b16b0d5
+
     return F_kp12
 end
 
@@ -64,17 +58,11 @@ end
     
     for i in range(Nx)
         for j in range(Ny)
-<<<<<<< HEAD
             continue
         end
     end
     boundary_set(u,k,F_kp21)
-=======
-            
-        end
-    end
-    boundary_set(F_kp21)
->>>>>>> 553b1f734a59bd075a3c44afc74b4fec5b16b0d5
+
     return F_kp21
 
 end
@@ -98,7 +86,6 @@ function main()
     F0 = zeros(param_N.Nx, param_N.Ny, param_N.Nz)
     F0[:,:,0]  = initial_set(param_mode,param_beam)
     F_result = zeros(param_N.Nx,param_N.Ny,param_N.Nz,param_N.Nt)
-    
     #F_k_1stは現在のF_k
     #F_k_2ndは更新されたF_k
     F_k_1st = zeros(param_N.Nx,param_N.Ny)
@@ -112,8 +99,5 @@ function main()
     F_k_1st = calcStep1(F_k_1st,F_k_2nd)
     #push(F_k_1st )
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 553b1f734a59bd075a3c44afc74b4fec5b16b0d5
 end
