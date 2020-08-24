@@ -9,7 +9,9 @@ using Plots
 using KTOptical
 using .Param
 # 計算条件###################
-#計算レンジ
+#計算レンジ 
+  
+  
 range = Param.range(xwidth = 100um, ywidth = 100um, zwidth = 100um,trange = 10)
 #計算ステップ
 step = Param.step(xstep = 0.1um, ystep = 0.1um, zstep = 0.05um)
