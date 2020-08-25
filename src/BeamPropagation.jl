@@ -45,26 +45,31 @@ function returnPades(T::Integer,N::Integer)
 end
 
 
-#ADIのX方向差分
-function calcStep1(F_k11, F_kp12)
+#ADIの未知数Y方向 定数X方向 差分
+@time function calcStep1(F_k11, F_kp12)
     k0 = 2π / beam.wavelength
     a = -1/(step.y)^2
     b = 1im*4*k0*retN()/step.z + 2/step.y^2 - k0^2(material.n^2-retN()^2)/2
-    c = -1/(step.y)^2
+    c = 1/(step.x)^2
+    d = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(material.n^2-retN()^2)/2
+    B = zeros(ComplexF64,Nx,1)
+    
+    #透明境界条件を使う場合、2からN-1 でいいのかしら？
     for j in 2:N.y-1
-        for i in 2:N.x -1
-            #Ax=BのA, z = k+1を作る。
-            A = Array(Diagonal(fill(b , (N.x, N.x))))
-
-
-
+        #Ax=BのA, z = k+1を作る。
+        A = diagm(N.y,N.y, fill(b, N.y)) + diagm(N.y, N.y, 1 => fill(a,N.y-1)) + diagm(N.y,N.y, -1 => fill(a,N.y-1))
+        
+        for i in 2:N.x-1
+            B[i] = c*F_k11[i]+d(F_k11[N.y*j + i-1]+F_k11[N.y*j + i+1])
         end
+        F_kp12[:,j] = B\A
     end
-    boundary_set(u,k,F_kp12)
+    
+
     return F_kp12
 end
 
-#ADIのY方向差分
+#ADIの未知数X方向 定数Y方向 差分
 function calcStep2(F_k12, F_kp21)
     for i in range(1,length = N.x)
         for j in range(1,length = N.y)
@@ -108,9 +113,9 @@ function main()
     #F_k_1stは現在のF_k
     #F_k_2ndは更新されたF_k
     @show N.x * N.y, N.x* N.y
-    F_k_1st = zeros(N.x, N.x)
+    F_k_1st = zeros(N.x, N.y)
 
-    F_k_2nd = zeros(N.y, N.y)
+    F_k_2nd = zeros(N.x, N.y)
 #    #左辺は更新されたF_k_1stが入る。
     #F_k_2ndは関数内部で毎回宣言した方がいいのか、
     #それとも一度宣言して引数として与えた方がいいのか（いまはこれ
