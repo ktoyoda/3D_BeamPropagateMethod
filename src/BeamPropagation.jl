@@ -12,9 +12,9 @@ using .Param
 # 計算条件###################
 #計算レンジ 
 
-crange = Param.crange(x = 100um, y = 100um, z = 100um, t = 10.0)
+crange = Param.crange(x = 25um, y = 25um, z = 100um, t = 10)
 #計算ステップ
-step = Param.step(x = 1um, y = 1um, z = 0.5um,t = 0.1)
+step = Param.step(x = 0.1um, y = 0.1um, z = 0.1um)
 Nx = Int(crange.x / step.x)
 Ny = Int(crange.y / step.y)
 Nz = Int(crange.z / step.z)
@@ -26,7 +26,7 @@ material = Param.materiarl(nb = 1.5, Δn0 = 0.01, τ = 0.1,α = 0)
 mode = Param.vortex_mode(l=1, p=0)
 
 #ビーム情報
-beam = Param.beam(w = 20um, U0 = 100.0::Float64, wavelength = 1.06um)
+beam = Param.beam(w = 20um, U0 = 100.0, wavelength = 1.064um)
 
 println("計算環境")
 versioninfo()
@@ -41,14 +41,23 @@ println("計算条件")
 @show beam
 
 println("//////////////////////////////")
-function returnPades(T::Intger,N::Intger)
+function returnPades(T::Integer,N::Integer)
 end
+
 
 #ADIのX方向差分
 function calcStep1(F_k11, F_kp12)
-    for i in range(1,length = N.x)
-        for j in range(1,length = N.y)
-            continue
+    k0 = 2π / beam.wavelength
+    a = -1/(step.y)^2
+    b = 1im*4*k0*retN()/step.z + 2/step.y^2 - k0^2(material.n^2-retN()^2)/2
+    c = -1/(step.y)^2
+    for j in 2:N.y-1
+        for i in 2:N.x -1
+            #Ax=BのA, z = k+1を作る。
+            A = Array(Diagonal(fill(b , (N.x, N.x))))
+
+
+
         end
     end
     boundary_set(u,k,F_kp12)
@@ -56,7 +65,7 @@ function calcStep1(F_k11, F_kp12)
 end
 
 #ADIのY方向差分
-function calcStep1(F_k12, F_kp21)
+function calcStep2(F_k12, F_kp21)
     for i in range(1,length = N.x)
         for j in range(1,length = N.y)
             continue
@@ -67,6 +76,7 @@ function calcStep1(F_k12, F_kp21)
 end
 
 function retN()
+    return 1
 end
 
 # 試験的。BPMのモード測定を使う
@@ -97,8 +107,10 @@ function main()
     F_result = zeros(Float64,(N.x,N.y,N.z));
     #F_k_1stは現在のF_k
     #F_k_2ndは更新されたF_k
-    F_k_1st = zeros(N.x,N.y)
-    F_k_2nd = zeros(N.x,N.y)
+    @show N.x * N.y, N.x* N.y
+    F_k_1st = zeros(N.x, N.x)
+
+    F_k_2nd = zeros(N.y, N.y)
 #    #左辺は更新されたF_k_1stが入る。
     #F_k_2ndは関数内部で毎回宣言した方がいいのか、
     #それとも一度宣言して引数として与えた方がいいのか（いまはこれ
