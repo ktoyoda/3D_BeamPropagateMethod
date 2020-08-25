@@ -15,6 +15,12 @@ git-tree-sha1 = "5ccb0770e3d1c185a52e6d36e3ffb830639ed3d2"
 uuid = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
 version = "1.0.6+3"
 
+[[CodecZlib]]
+deps = ["TranscodingStreams", "Zlib_jll"]
+git-tree-sha1 = "ded953804d019afa9a3f98981d99b33e3db7b6da"
+uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
+version = "0.7.0"
+
 [[ColorSchemes]]
 deps = ["ColorTypes", "Colors", "FixedPointNumbers", "Random", "StaticArrays"]
 git-tree-sha1 = "7a15e3690529fd1042f0ab954dff7445b1efc8a5"
@@ -79,6 +85,12 @@ git-tree-sha1 = "1af4493ff9a069e26a538d6f113816b237d3cc37"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
 version = "4.3.1+1"
 
+[[FileIO]]
+deps = ["Pkg"]
+git-tree-sha1 = "1e7e88a949b52e6f7f589041bd60928322414997"
+uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+version = "1.4.1"
+
 [[FixedPointNumbers]]
 deps = ["Statistics"]
 git-tree-sha1 = "335bfdceacc84c5cdf16aadc768aa5ddfc5383cc"
@@ -141,11 +153,25 @@ git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
 
+[[JLD2]]
+deps = ["CodecZlib", "DataStructures", "FileIO", "Mmap", "Pkg", "Printf", "UUIDs"]
+git-tree-sha1 = "9353b717ee4e27beab4e902c92a06bb5f160d2cf"
+uuid = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+version = "0.1.14"
+
 [[JSON]]
 deps = ["Dates", "Mmap", "Parsers", "Unicode"]
 git-tree-sha1 = "b34d7cef7b337321e97d22242c3c2b91f476748e"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.0"
+
+[[KTOptical]]
+deps = ["Parameters"]
+git-tree-sha1 = "b112a1979d8bafb8db0e1551434c803b715483e3"
+repo-rev = "master"
+repo-url = "..\\..\\KTOptical"
+uuid = "ed197631-8daa-418e-b8e5-9a22867085b7"
+version = "0.1.0"
 
 [[LAME_jll]]
 deps = ["Libdl", "Pkg"]
@@ -362,6 +388,12 @@ version = "1.0.5"
 [[Test]]
 deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[[TranscodingStreams]]
+deps = ["Random", "Test"]
+git-tree-sha1 = "7c53c35547de1c5b9d46a4797cf6d8253807108c"
+uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
+version = "0.9.5"
 
 [[UUIDs]]
 deps = ["Random", "SHA"]

@@ -4,52 +4,60 @@
 # struct の初期化のため、Parameters をインクルードする。
 
 #negative value の累乗は.0を付ける
-m = 1
-mm = 10^(-3.0m)
-um = 10^(-6.0m)
-nm = 10^(-9.0m)
 
 # 実験条件####################
 module Param
+   export  m
+   export  mm
+   export  um
+   export  nm 
+
+
+    m = 1
+    mm = 10^(-3.0m)
+    um = 10^(-6.0m)
+    nm = 10^(-9.0m)
+
+
     using Parameters
-    @with_kw struct range
+    @with_kw struct crange{AbstractFloat}
         # セルの距離(um)
-        xwidth::Float64 = 100um
-        ywidth::Float64 = 100um
-        zwidth::Float64 = 100um
-        trange::Float64 = 10
+        x::AbstractFloat = 100um
+        y::AbstractFloat = 100um
+        z::AbstractFloat = 100um
+        t::AbstractFloat = 10
     end
-    @with_kw struct step
+    @with_kw struct step{AbstractFloat}
         # セルのステップ（um
-        xstep::Float64 = 0.1um
-        ystep::Float64 = 0.1um
-        zstep::Float64 = 0.1um
-        tstep::Float64 = 0.1
+        x::AbstractFloat = 0.1um
+        y::AbstractFloat = 0.1um
+        z::AbstractFloat = 0.1um
+        t::AbstractFloat = 0.1
     end
 
-    @with_kw struct N
-        Nx::Int32
-        Ny::Int32
-        Nz::Int32
-        Nt::Int32
+    @with_kw struct N{Integer}
+        x::Integer
+        y::Integer
+        z::Integer
+        t::Integer
     end
-    @with_kw struct materiarl
-        nb::Float64 =1.5
-        Δn0::Float64 = 0.03
-        τ::Float64 = 0.1
-        α::Float64 = 0
+    @with_kw struct materiarl{AbstractFloat,Number}
+        nb::AbstractFloat =1.5
+        Δn0::AbstractFloat = 0.03
+        τ::AbstractFloat = 0.1
+        α::Number = 0
     end
-    @with_kw struct beam
-        w::Float64 = 3um
-        U0::Float64 = 100
-        wavelength::Float64 = 1.06um
+    @with_kw struct beam{AbstructFloat}
+        w::AbstractFloat = 3um
+        U0::AbstractFloat = 100.0
+        wavelength::AbstractFloat = 1.06um
     end
-    @with_kw struct gauss_mode
-        m::Int16 = 1
-        n::Int16 = 1
+    @with_kw struct gauss_mode{Inteteger}
+        m::Integer = 1
+        n::Integer = 1
     end
-    @with_kw struct vortex_mode
-        l::Int16 = 1
-        p::Int16 = 1
+    @with_kw struct vortex_mode{Integer}
+        l::Integer = 1
+        p::Integer = 1
     end
 end
