@@ -14,7 +14,7 @@ using .Param
 
 crange = Param.crange(x = 50um, y = 50um, z = 100um, t = 10)
 #計算ステップ
-step = Param.step(x = 0.1um, y = 0.1um, z = 0.1um)
+step = Param.step(x = 0.25um, y = 0.25um, z = 0.25um)
 Nx = Int(crange.x / step.x)
 Ny = Int(crange.y / step.y)
 Nz = Int(crange.z / step.z)
@@ -44,6 +44,11 @@ println("//////////////////////////////")
 function returnPades(T::Integer,N::Integer)
 end
 
+#ビームの集光をテーパー型の屈折率分布として表現する。
+function setinitN(N::Array{ComplexF64,2},NA:,material.n)
+
+
+end
 
 #ADIの未知数Y方向 定数X方向 差分
 @time function calcStep1(F_k11, F_kp12)
@@ -59,7 +64,7 @@ end
         A = diagm(N.y,N.y, fill(b, N.y)) + diagm(N.y, N.y, 1 => fill(a,N.y-1)) + 
                 diagm(N.y,N.y, -1 => fill(a,N.y-1))
         for i in 2:N.x-1
-            B[i] = c*F_k11[i]+d*(F_k11[N.y*j + i-1]+F_k11[N.y*j + i+1])
+            B[i] = c*F_k11[N.y * j + i]+d*(F_k11[N.y*j + i-1]+F_k11[N.y*j + i+1])
         end
         F_kp12[:,j] = B\A
     end
@@ -80,7 +85,7 @@ function calcStep2(F_k12, F_kp21)
         A = diagm(N.x,N.x, fill(b, N.x)) + diagm(N.x, N.x, 1 => fill(a,N.x-1)) + 
                 diagm(N.x,N.x, -1 => fill(a,N.x-1))
         for j in 2:N.y-1
-            B[j] = c*F_k12[j]+d*(F_k12[N.x*i + j-1]+F_k12[N.x*i + j+1])
+            B[j] = c*F_k12[N.x*i + j]+d*(F_k12[N.x*i + j-1]+F_k12[N.x*i + j+1])
         end
         F_kp21[i,:] = B\A
     end
