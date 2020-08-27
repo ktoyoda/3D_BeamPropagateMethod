@@ -11,7 +11,7 @@ using .Param
 using BenchmarkTools
 #using FileIO
 # 計算条件###################
-#計算レンジ 
+#計算レンジ
 
 crange = Param.crange(x = 50um, y = 50um, z = 100um, t = 10)
 #計算ステップ
@@ -30,7 +30,7 @@ mode = Param.vortex_mode(l=1, p=0)
 beam = Param.beam(w = 20um, U0 = 100.0, wavelength = 1.064um)
 
 println("計算環境")
-versioninfo()
+#versioninfo()
 Pkg.status()
 
 println("計算条件")
@@ -47,6 +47,11 @@ end
 
 #ビームの集光をテーパー型の屈折率分布として表現する。
 function setinitN(N::Array{ComplexF64,2},NA,n)
+    for i in 1:N
+        for j in 1:N
+            N[i,j] = 0
+        end
+    end
 
 end
 
@@ -62,13 +67,16 @@ function calcStep1(F_k11, F_kp12)
     d = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(material.n^2-retN()^2)/2
     B = zeros(ComplexF64,N.x,1)
     #透明境界条件を使う場合、2からN-1 でいいのかしら？
-    for j in 2:N.y-1
+    for j in 1:N.y
         #Ax=BのA, z = k+1を作る。
         A = diagm(N.y,N.y, fill(b, N.y)) + diagm(N.y, N.y, 1 => fill(a,N.y-1)) +
                 diagm(N.y,N.y, -1 => fill(a,N.y-1))
         #透明境界条件(TBC) for A#######
-        kxr = -1/(1im * step.y)*log(F_k11[1,j]/F_k11[2,j])
-        kxl = -1/(1im * step.y)*log(F_k11[N.y,j]/F_k11[N.y-1,j])
+        ηL = F_k11[1,j]/F_k11[2,j]
+        ηR = F_k11[N.y,j]/F_k11[N.y-1,j]
+        kxr = -1/(1im * step.y)*log(ηL)
+        kxl = -1/(1im * step.y)*log(ηR)
+        neff = retN()
         A[1,1] += exp(1im * kxr *(-step.y))
         A[N.y,N.y] += exp(1im * kxl *(-step.y))
         #########################
@@ -76,11 +84,13 @@ function calcStep1(F_k11, F_kp12)
             B[i] = c*F_k11[N.y * j + i]+d*(F_k11[N.y*j + i-1]+F_k11[N.y*j + i+1])
         end
 
-        #透明境界条件(TBC) for B#######
-        kxr = -1/(1im * step.y)*log(F_k11[1,j]/F_k11[2,j])
-        kxl = -1/(1im * step.y)*log(F_k11[N.y,j]/F_k11[N.y-1,j])
-        A[1,1] += exp(1im * kxr *(-step.y))
-        A[N.y,N.y] += exp(1im * kxl *(-step.y))
+        # 透明境界条件(TBC) for B#######
+        # 参考文献 ●●● p.xxx
+        colBL = (2-ηL)/step.x^2 - (material.nb^2-retN()*retN())*k0^2 + (4im*retN()*k0)/step.z
+        colBR = (2-ηR)/step.x^2 - (material.nb^2-retN()*retN())*k0^2 + (4im*retN()*k0)/step.z
+        colC = -1/(step.x)^2
+        B[1] = -conj(colBL)*F_k11[1,j] - colC*F_k11[2,j]
+        B[N.x] = -conj(colBR)*F_k11[N.x,j] - colC*F_k11[N.x-1,j]
         #########################
         F_kp12[:,j] = B\A
     end
@@ -89,11 +99,12 @@ end
 
 #ADIの未知数X方向 定数Y方向 差分
 function calcStep2(F_k12, F_kp21)
+    
     k0 = 2π / beam.wavelength
     a = -1/(step.x)^2
-    b = 1im*4*k0*retN()/step.z + 2/step.x^2 - k0^2(material.n^2-retN()^2)/2
+    b = 1im*4*k0*retN()/step.z + 2/step.x^2 - k0^2(material.nb^2-retN()*retN())/2
     c = 1/(step.y)^2
-    d = 1im*4*k0*retN()/step.z - 2/step.y^2 + k0^2(material.n^2-retN()^2)/2
+    d = 1im*4*k0*retN()/step.z - 2/step.y^2 + k0^2(material.nb^2-retN()*retN())/2
     B = zeros(ComplexF64,Ny,1)
     #透明境界条件を使う場合、2からN-1 でいいのかしら？
     for i in 2:N.x-1
