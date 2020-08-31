@@ -46,10 +46,24 @@ println("//////////////////////////////")
 function returnPades(T::Integer,N::Integer)
 end
 
-#ADIの未知数Y方向 定数X方向 差分
 #F_k11 既知のビーム伝搬
 #F_kp12 未知のビーム伝搬の格納先(F_k+1/2)
 #k 今のZカウント
+# 2
+# 2020/8/31
+# 各Zに対して、calcstepを１，２の順で回していく。
+# step 1 は、
+# ADIの未知数Y方向 定数X方向 差分
+# Ax = B をつくってトーマスアルゴリズムで解く
+# juliaの場合はB\Aでよい。(バックスラッシュ！）
+# Aが N.ｙ＊N.ｙ(z=k+1の係数)
+# xがN.yサイズのベクトル
+# BがN.xサイズのベクトル(z=kの係数)
+# 各A,Bに入る屈折率項は座標情報が必要である。
+# Aに入るのは()
+# 
+# 
+
 function calcStep1(F_k11, F_kp12,k)
     k0 = 2π / beam.wavelength
     a = -1/(step.y)^2
