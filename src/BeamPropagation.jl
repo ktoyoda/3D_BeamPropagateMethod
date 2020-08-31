@@ -46,23 +46,32 @@ println("//////////////////////////////")
 function returnPades(T::Integer,N::Integer)
 end
 
-#F_k11 既知のビーム伝搬
-#F_kp12 未知のビーム伝搬の格納先(F_k+1/2)
-#k 今のZカウント
+
 # 2
 # 2020/8/31
 # 各Zに対して、calcstepを１，２の順で回していく。
 # step 1 は、
-# ADIの未知数Y方向 定数X方向 差分
+# ADIの未知数Y方向(j) 定数X方向(i) 差分
+# 
 # Ax = B をつくってトーマスアルゴリズムで解く
 # juliaの場合はB\Aでよい。(バックスラッシュ！）
 # Aが N.ｙ＊N.ｙ(z=k+1の係数)
+# すなわち、(x,y,z) = (i,j,k)において、
+# i、k 固定で 
+# A[J,J] の時、j=J
+# A[J±1, J]の時、j=J±1
+# である。 
 # xがN.yサイズのベクトル
-# BがN.xサイズのベクトル(z=kの係数)
+# これは各座標の波動方程式の解であるため、考慮する必要はない。
+#
+# BがN.yサイズのベクトル(z=kの係数)
+# 
 # 各A,Bに入る屈折率項は座標情報が必要である。
 # Aに入るのは()
 # 
-# 
+##F_k11 既知のビーム伝搬
+#F_kp12 未知のビーム伝搬の格納先(F_k+1/2)
+#k 今のZカウント
 
 function calcStep1(F_k11, F_kp12,k)
     k0 = 2π / beam.wavelength
@@ -70,10 +79,10 @@ function calcStep1(F_k11, F_kp12,k)
     b(i,j) = 1im*4*k0*retN()/step.z + 2/step.y^2 - k0^2(matN[i, j, k]-1.35^2)/2
     c = 1/(step.x)^2
     d(i,j) = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
-    B = zeros(ComplexF64,N.x,1)
+    B = zeros(ComplexF64,N.y,1)
 
     
-    for j in 1:N.y
+    for i in 1:N.x
         #Ax=BのA, z = k+1を作る。
         
         A = diagm(N.y,N.y, fill(b, N.y)) + diagm(N.y, N.y, 1 => fill(a,N.y-1)) +
@@ -87,7 +96,7 @@ function calcStep1(F_k11, F_kp12,k)
         A[1,1] += exp(1im * kxr *(-step.y))
         A[N.y,N.y] += exp(1im * kxl *(-step.y))
         #########################
-        for i in 2:N.x-1
+        for j in 2:N.y-1
             B[i] = c*F_k11[N.y * j + i]+d*(F_k11[N.y*j + i-1]+F_k11[N.y*j + i+1])
         end
 
