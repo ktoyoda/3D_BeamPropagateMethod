@@ -58,9 +58,10 @@ function calcStep1(F_k11, F_kp12,k)
     d(i,j) = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
     B = zeros(ComplexF64,N.x,1)
 
-    #透明境界条件を使う場合、2からN-1 でいいのかしら？
+    
     for j in 1:N.y
         #Ax=BのA, z = k+1を作る。
+        
         A = diagm(N.y,N.y, fill(b, N.y)) + diagm(N.y, N.y, 1 => fill(a,N.y-1)) +
                 diagm(N.y,N.y, -1 => fill(a,N.y-1))
         #透明境界条件(TBC) for A#######
