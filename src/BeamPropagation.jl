@@ -2,17 +2,18 @@
 using Pkg
 
 include("parameter.jl")
-
+include("propagator.jl")
 #計算に使うパッケージ
 using LinearAlgebra
 using Plots
 using KTOptical
 using .Param
 using BenchmarkTools
+using JLD2
 #using FileIO
 # 計算条件###################
 #計算レンジ
-
+#um = params.um
 crange = Param.crange(x = 50um, y = 50um, z = 100um, t = 10)
 #計算ステップ
 step = Param.step(x = 0.25um, y = 0.25um, z = 0.25um)
@@ -45,16 +46,6 @@ println("//////////////////////////////")
 function returnPades(T::Integer,N::Integer)
 end
 
-#ビームの集光をテーパー型の屈折率分布として表現する。
-function setinitN(N::Array{ComplexF64,2},NA,n)
-    for i in 1:N
-        for j in 1:N
-            N[i,j] = 0
-        end
-    end
-
-end
-
 #ADIの未知数Y方向 定数X方向 差分
 #F_k11 既知のビーム伝搬
 #F_kp12 未知のビーム伝搬の格納先(F_k+1/2)
@@ -66,6 +57,7 @@ function calcStep1(F_k11, F_kp12)
     c = 1/(step.x)^2
     d = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(material.n^2-retN()^2)/2
     B = zeros(ComplexF64,N.x,1)
+
     #透明境界条件を使う場合、2からN-1 でいいのかしら？
     for j in 1:N.y
         #Ax=BのA, z = k+1を作る。
@@ -99,23 +91,7 @@ end
 
 #ADIの未知数X方向 定数Y方向 差分
 function calcStep2(F_k12, F_kp21)
-    
-    k0 = 2π / beam.wavelength
-    a = -1/(step.x)^2
-    b = 1im*4*k0*retN()/step.z + 2/step.x^2 - k0^2(material.nb^2-retN()*retN())/2
-    c = 1/(step.y)^2
-    d = 1im*4*k0*retN()/step.z - 2/step.y^2 + k0^2(material.nb^2-retN()*retN())/2
-    B = zeros(ComplexF64,Ny,1)
-    #透明境界条件を使う場合、2からN-1 でいいのかしら？
-    for i in 2:N.x-1
-        #Ax=BのA, z = k+1を作る。
-        A = diagm(N.x,N.x, fill(b, N.x)) + diagm(N.x, N.x, 1 => fill(a,N.x-1)) + 
-                diagm(N.x,N.x, -1 => fill(a,N.x-1))
-        for j in 2:N.y-1
-            B[j] = c*F_k12[N.x*i + j]+d*(F_k12[N.x*i + j-1]+F_k12[N.x*i + j+1])
-        end
-        F_kp21[i,:] = B\A
-    end
+ 
     return F_kp21
 end
 
@@ -156,8 +132,11 @@ function main()
     F_k_2nd = zeros(N.x, N.y)
 #    #左辺は更新されたF_k_1stが入る。
 
-    F_k_1st = calcStep1(F_k_1st,F_k_2nd)
-    F_k_2nd = calcStep2(F_k_1st,F_k_2nd)
+    for t in 1:N.t
+        F_k_1st = calcStep1(F_k_1st,F_k_2nd)
+        F_k_2nd = calcStep2(F_k_1st,F_k_2nd)
+        @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
+    end
     "done"
 end
 
