@@ -12,7 +12,6 @@ module Param
    export  um
    export  nm
 
-
     m = 1
     mm = 10^(-3.0m)
     um = 10^(-6.0m)
@@ -52,7 +51,6 @@ module Param
         Δn0::Float64 = 0.03
         τ::Float64 = 0.1
         α::Float64 = 0.0
-        n::Float64 = 1.3
     end
     @with_kw struct beam
         w::Float64 = 3um

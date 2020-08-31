@@ -49,13 +49,13 @@ end
 #ADIの未知数Y方向 定数X方向 差分
 #F_k11 既知のビーム伝搬
 #F_kp12 未知のビーム伝搬の格納先(F_k+1/2)
-
-function calcStep1(F_k11, F_kp12)
+#k 今のZカウント
+function calcStep1(F_k11, F_kp12,k)
     k0 = 2π / beam.wavelength
     a = -1/(step.y)^2
-    b = 1im*4*k0*retN()/step.z + 2/step.y^2 - k0^2(material.n^2-retN()^2)/2
+    b(i,j) = 1im*4*k0*retN()/step.z + 2/step.y^2 - k0^2(matN[i, j, k]-1.35^2)/2
     c = 1/(step.x)^2
-    d = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(material.n^2-retN()^2)/2
+    d(i,j) = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
     B = zeros(ComplexF64,N.x,1)
 
     #透明境界条件を使う場合、2からN-1 でいいのかしら？
@@ -78,8 +78,8 @@ function calcStep1(F_k11, F_kp12)
 
         # 透明境界条件(TBC) for B#######
         # 参考文献 ●●● p.xxx
-        colBL = (2-ηL)/step.x^2 - (material.nb^2-retN()*retN())*k0^2 + (4im*retN()*k0)/step.z
-        colBR = (2-ηR)/step.x^2 - (material.nb^2-retN()*retN())*k0^2 + (4im*retN()*k0)/step.z
+        colBL = (2-ηL)/step.x^2 - (matN[i,j]-1.35^2)*k0^2 + (4im*retN()*k0)/step.z
+        colBR = (2-ηR)/step.x^2 - (matN[i,j]-1.35^2)*k0^2 + (4im*retN()*k0)/step.z
         colC = -1/(step.x)^2
         B[1] = -conj(colBL)*F_k11[1,j] - colC*F_k11[2,j]
         B[N.x] = -conj(colBR)*F_k11[N.x,j] - colC*F_k11[N.x-1,j]
@@ -90,8 +90,9 @@ function calcStep1(F_k11, F_kp12)
 end
 
 #ADIの未知数X方向 定数Y方向 差分
-function calcStep2(F_k12, F_kp21)
- 
+function calcStep2(F_k12, F_kp21,k)
+    #正確には、k+1とKの屈折率の平均を取るべきだと思うが、
+    #今のところはk+1を抜き出す   
     return F_kp21
 end
 
@@ -130,11 +131,17 @@ function main()
     @show N.x * N.y, N.x* N.y
     F_k_1st = zeros(N.x, N.y)
     F_k_2nd = zeros(N.x, N.y)
-#    #左辺は更新されたF_k_1stが入る。
+    matN = zeros(ComplexF64,(N.x,N.y,N.z))
+    typeof(matN)
+    setNwaveguide!(matN, step.x, step.y, step.z, 4um, 0, material.nb, material.nb + material.Δn0, 0.5)
+    #左辺は更新されたF_k_1stが入る。
+    # 
 
     for t in 1:N.t
-        F_k_1st = calcStep1(F_k_1st,F_k_2nd)
-        F_k_2nd = calcStep2(F_k_1st,F_k_2nd)
+        for k in 1:N.z-1
+            F_k_1st = calcStep1(F_k_1st, F_k_2nd, k)
+            F_k_2nd = calcStep2(F_k_1st, F_k_2nd, k)
+        end
         @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
     end
     "done"
