@@ -102,6 +102,7 @@ function calcStep1!(F_k11, F_kp12,k)
         A += diagm(-1 => map(j -> b(i,j,k),1:N.y-1))
 
         #透明境界条件(TBC) for A#######
+        #左端---------------------
         imKxL = -(1/step.y)   * log(abs(F_k11[2,j]/F_k11[1,j]))
         reKxL = -(1im/step.y) * log(abs(F_k11[2,j]/F_k11[1,j]*exp(imKxL*step.y)))
         if reKxL<0
@@ -109,14 +110,17 @@ function calcStep1!(F_k11, F_kp12,k)
         end
         ηL = exp(1im* reKxL * step.y - imKxl*step.y)
 
-        ηL = F_k11[1,j]/F_k11[2,j]
-        ηR = F_k11[N.y,j]/F_k11[N.y-1,j]
+        A[1,1] -= ηL/(step.y)^2
 
-
-        kxr = -1/(1im * step.y)*log(ηL)
-        kxl = -1/(1im * step.y)*log(ηR)
-        A[1,1] += exp(1im * kxr *(-step.y))
-        A[N.y,N.y] += exp(1im * kxl *(-step.y))
+        #右端---------------------
+        imKxR = (1/step.y)   * log(abs(F_k11[N.x,j]/F_k11[N.x-1,j]))
+        reKxR = (1im/step.y) * log(abs(F_k11[N.x,j]/F_k11[N.x-1,j]*exp(-imKxR*step.y)))
+        if reKxL<0
+            reKxL = -1*reKxL
+        end
+        ηR = exp(1im* reKxL * step.y - imKxR* step.y)
+        
+        A[N.y,N.y] -= exp(-1im * kxl *(-step.y))
         #########################
         for j in 2:N.y-1
             B[i] = c*F_k11[N.y * j + i]+d*(F_k11[N.y*j + i-1]+F_k11[N.y*j + i+1])
