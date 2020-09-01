@@ -73,26 +73,48 @@ end
 #F_kp12 未知のビーム伝搬の格納先(F_k+1/2)
 #k 今のZカウント
 
-function calcStep1(F_k11, F_kp12,k)
+# calcStep1は
+# 「未知数M個(Y方向)、バンド幅３の連立一次方程式をN個(X方向)個解く」
+# 藪哲郎光導波路132Pより
+#
+# つまり、calcStep1の内部ではN.x回ループを回し、
+# その都度Ax=Bを作成して解く。
+# z = kに関しては
+# Step1,Step2の組み合わせを複数回周回することになる。
+# t = n に関しては、
+# 上記で作った新しい屈折率マップをもとに、
+# 再度回していく。
+
+function calcStep1!(F_k11, F_kp12,k)
     k0 = 2π / beam.wavelength
     a = -1/(step.y)^2
-    b(i,j) = 1im*4*k0*retN()/step.z + 2/step.y^2 - k0^2(matN[i, j, k]-1.35^2)/2
+    b(i,j,k) = 1im*4*k0*retN()/step.z + 2/step.y^2 - k0^2(matN[i, j, k]-1.35^2)/2
     c = 1/(step.x)^2
-    d(i,j) = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
+    d(i,j,k) = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
     B = zeros(ComplexF64,N.y,1)
 
-    
     for i in 1:N.x
-        #Ax=BのA, z = k+1を作る。
-        
-        A = diagm(N.y,N.y, fill(b, N.y)) + diagm(N.y, N.y, 1 => fill(a,N.y-1)) +
-                diagm(N.y,N.y, -1 => fill(a,N.y-1))
+        # Ax=BのA, z = k+1を作る。
+        # mapでベクトルを作っておいて、diagmで対角行列にする。
+        # bが位置によって値が異なるのでmapで対応。
+        A = diagm(map(j -> b(i,j,k),1:N.y))
+        A += diagm( 1 => map(j -> b(i,j,k),1:N.y-1))
+        A += diagm(-1 => map(j -> b(i,j,k),1:N.y-1))
+
         #透明境界条件(TBC) for A#######
+        imKxL = -(1/step.y)   * log(abs(F_k11[2,j]/F_k11[1,j]))
+        reKxL = -(1im/step.y) * log(abs(F_k11[2,j]/F_k11[1,j]*exp(imKxL*step.y)))
+        if reKxL<0
+            reKxL = -1*reKxL
+        end
+        ηL = exp(1im* reKxL * step.y - imKxl*step.y)
+
         ηL = F_k11[1,j]/F_k11[2,j]
         ηR = F_k11[N.y,j]/F_k11[N.y-1,j]
+
+
         kxr = -1/(1im * step.y)*log(ηL)
         kxl = -1/(1im * step.y)*log(ηR)
-        neff = retN()
         A[1,1] += exp(1im * kxr *(-step.y))
         A[N.y,N.y] += exp(1im * kxl *(-step.y))
         #########################
@@ -102,19 +124,22 @@ function calcStep1(F_k11, F_kp12,k)
 
         # 透明境界条件(TBC) for B#######
         # 参考文献 ●●● p.xxx
-        colBL = (2-ηL)/step.x^2 - (matN[i,j]-1.35^2)*k0^2 + (4im*retN()*k0)/step.z
-        colBR = (2-ηR)/step.x^2 - (matN[i,j]-1.35^2)*k0^2 + (4im*retN()*k0)/step.z
+        colBL = (2-ηL)/step.x^2 - (matN[i,j,k]-1.35^2)*k0^2 + (4im*matN[i,j,k]*k0)/step.z
+        colBR = (2-ηR)/step.x^2 - (matN[i,j,k]-1.35^2)*k0^2 + (4im*matN[i,j,k]*k0)/step.z
         colC = -1/(step.x)^2
         B[1] = -conj(colBL)*F_k11[1,j] - colC*F_k11[2,j]
         B[N.x] = -conj(colBR)*F_k11[N.x,j] - colC*F_k11[N.x-1,j]
         #########################
         F_kp12[:,j] = B\A
+
+
+
     end
     return F_kp12
 end
 
 #ADIの未知数X方向 定数Y方向 差分
-function calcStep2(F_k12, F_kp21,k)
+function calcStep2!(F_k12, F_kp21,k)
     #正確には、k+1とKの屈折率の平均を取るべきだと思うが、
     #今のところはk+1を抜き出す   
     return F_kp21
@@ -163,8 +188,8 @@ function main()
 
     for t in 1:N.t
         for k in 1:N.z-1
-            F_k_1st = calcStep1(F_k_1st, F_k_2nd, k)
-            F_k_2nd = calcStep2(F_k_1st, F_k_2nd, k)
+            calcStep1!(F_k_1st, F_k_2nd, k)
+            calcStep2!(F_k_2nd, F_k_1st, k)
         end
         @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
     end

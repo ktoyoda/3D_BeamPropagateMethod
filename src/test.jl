@@ -1,27 +1,11 @@
-Pkg.add("BenchmarkTools")
-Pkg.add("CSV")
-Pkg.add("ColorSchemes")
-Pkg.add("Conda")
-Pkg.add("DataFrames")
-Pkg.add("FileIO")
-Pkg.add("IJulia ")
-Pkg.add("ImageIO")
-Pkg.add("ImageMagick")
-Pkg.add("ImageShow")
-Pkg.add("ImageView")
-Pkg.add("Images ")
-Pkg.add("IntervalArithmetic ")
-Pkg.add("Makie ")
-Pkg.add("Measures")
-Pkg.add("PackageCompiler")
-Pkg.add("Parameters ")
-Pkg.add("PkgTemplates")
-Pkg.add("Plotly")
-Pkg.add("Plots")
-Pkg.add("Pluto ")
-Pkg.add("PyCall ")
-Pkg.add("PyPlot")
-Pkg.add("QML")
-Pkg.add("Revise")
-Pkg.add("SpecialFunctions")
-Pkg.add("LinearAlgebra")
+using LinearAlgebra
+using Distributed
+function test(n)
+    b(i) = i^2
+    A = diagm(pmap(x -> b(x),1:n))
+    A +=diagm(1 => pmap(x -> b(x),1:n-1))
+    A +=diagm(-1 => pmap(x -> b(x),1:n-1))
+end 
+
+
+@time test(5000)
