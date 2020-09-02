@@ -1,11 +1,19 @@
-using LinearAlgebra
-using Distributed
-function test(n)
-    b(i) = i^2
-    A = diagm(pmap(x -> b(x),1:n))
-    A +=diagm(1 => pmap(x -> b(x),1:n-1))
-    A +=diagm(-1 => pmap(x -> b(x),1:n-1))
-end 
+# 1億まで足し続けるプログラム
+println("Julia 非関数")
+sum = 0
+@time for i in 1:100000000
+    global sum += i
+end
 
+println("Julia 関数")
+function sumtest()
+    sum = 0
+    for i in 1:100000000
+        sum += i
+    end
 
-@time test(5000)
+    @show sum
+
+end
+
+@time sumtest()

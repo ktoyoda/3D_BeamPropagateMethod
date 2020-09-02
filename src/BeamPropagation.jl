@@ -15,6 +15,7 @@ using JLD2
 # 計算条件###################
 #計算レンジ
 #um = params.um
+#um = params.um
 crange = Param.crange(x = 50um, y = 50um, z = 100um, t = 10)
 #計算ステップ
 step = Param.step(x = 0.25um, y = 0.25um, z = 0.25um)
@@ -48,13 +49,13 @@ function returnPades(T::Integer,N::Integer)
 end
 
 
-# 2
+# 
 # 2020/8/31
 # 各Zに対して、calcstepを１，２の順で回していく。
 # step 1 は、
 # ADIの未知数Y方向(j) 定数X方向(i) 差分
 # 
-# Ax = B をつくってトーマスアルゴリズムで解く
+# Ax = B をつくってトーマスアルゴリズムJFで解く
 # juliaの場合はB\Aでよい。(バックスラッシュ！）
 # Aが N.ｙ＊N.ｙ(z=k+1の係数)
 # すなわち、(x,y,z) = (i,j,k)において、
@@ -73,7 +74,6 @@ end
 ##F_k11 既知のビーム伝搬
 #F_kp12 未知のビーム伝搬の格納先(F_k+1/2)
 #k 今のZカウント
-
 # calcStep1は
 # 「未知数M個(Y方向)、バンド幅３の連立一次方程式をN個(X方向)個解く」
 # 藪哲郎光導波路132Pより
@@ -86,12 +86,12 @@ end
 # 上記で作った新しい屈折率マップをもとに、
 # 再度回していく。
 
-function calcStep1!(F_k11, F_kp12,k)
+function calcStep1!(F_k11, F_kp12,k,matN)
     k0 = 2π / beam.wavelength
     a = -1/(step.y)^2
-    b(i,j,k) = 1im*4*k0*retN()/step.z + 2/step.y^2 - k0^2(matN[i, j, k]-1.35^2)/2
+    b(i,j,k) = 1im*4*k0*matN[i, j, k]/step.z + 2/step.y^2 - k0^2(matN[i, j, k]-1.35^2)/2
     c = 1/(step.x)^2
-    d(i,j,k) = 1im*4*k0*retN()/step.z - 2/step.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
+    d(i,j,k) = 1im*4*k0*matN[i, j, k]/step.z - 2/step.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
     B = zeros(ComplexF64,N.y,1)
 
     for i in 1:N.x
@@ -105,38 +105,37 @@ function calcStep1!(F_k11, F_kp12,k)
 
         #透明境界条件(TBC) for A#######
         #左端---------------------
-        imKxL = -(1/step.y)   * log(abs(F_k11[2,j]/F_k11[1,j]))
-        reKxL = -(1im/step.y) * log(abs(F_k11[2,j]/F_k11[1,j]*exp(imKxL*step.y)))
-        if reKxL<0
+        imKxL = -(1/step.y)   * log(abs(F_k11[i,2]/F_k11[i,1]))
+        reKxL = -(1im/step.y) * log(abs(F_k11[i,2]/F_k11[i,1]*exp(imKxL*step.y)))
+        if real(reKxL)<0
             reKxL = -1*reKxL
         end
-        ηL = exp(1im* reKxL * step.y - imKxl*step.y)
+        ηL = exp(1im* reKxL * step.y - imKxL*step.y)
 
         A[1,1] -= ηL/(step.y)^2
 
         #右端---------------------
-        imKxR = (1/step.y)   * log(abs(F_k11[N.x,j]/F_k11[N.x-1,j]))
-        reKxR = (1im/step.y) * log(abs(F_k11[N.x,j]/F_k11[N.x-1,j]*exp(-imKxR*step.y)))
-        if reKxR<0
-            reKxR = -1*reKxR
+        imKxR = (1/step.y)   * log(abs(F_k11[i,N.y-2]/F_k11[i,N.y-1]))
+        reKxR = (1im/step.y) * log(abs(F_k11[i,N.y-2]/F_k11[i,N.y-1]*exp(-imKxR*step.y)))
+        if real(reKxR)<0
+            reKxR = -reKxR
         end
         ηR = exp(1im* reKxR * step.y - imKxR* step.y)
-        
         A[N.y,N.y] -= ηR/(step.y)^2
         #########################
         for j in 2:N.y-1
-            B[i] = c*F_k11[N.y * j + i]+d*(F_k11[N.y*j + i-1]+F_k11[N.y*j + i+1])
+            B[i] = c*F_k11[N.y * j + i] + d(i,j,k)*F_k11[N.y*j + i-1] + d(i,j,k)* F_k11[N.y*j + i+1]
         end
 
         # 透明境界条件(TBC) for B#######
         # 参考文献 ●●● p.xxx
-        colBL = (2-ηL)/step.y^2 - (matN[i,j,k]-1.35^2)*k0^2 + (4im*matN[i,j,k]*k0)/step.z
-        colBR = (2-ηR)/step.y^2 - (matN[i,j,k]-1.35^2)*k0^2 + (4im*matN[i,j,k]*k0)/step.z
+        colBL = (2-ηL)/step.y^2 - (matN[i,1,k]-1.35^2)*k0^2 + (4im*matN[i,1,k]*k0)/step.z
+        colBR = (2-ηR)/step.y^2 - (matN[i,N.y,k]-1.35^2)*k0^2 + (4im*matN[i,N.y,k]*k0)/step.z
         colC = -1/(step.x)^2
-        B[1] = -conj(colBL)*F_k11[1,j] - colC*F_k11[2,j]
-        B[N.x] = -conj(colBR)*F_k11[N.x,j] - colC*F_k11[N.x-1,j]
+        B[1] = -conj(colBL)*F_k11[i,1] - colC*F_k11[i,2]
+        B[N.x] = -conj(colBR)*F_k11[i,N.y] - colC*F_k11[i,N.y-1]
         #########################
-        F_kp12[:,j] = B\A
+        F_kp12[i,:] = B\A
 
 
 
@@ -145,7 +144,7 @@ function calcStep1!(F_k11, F_kp12,k)
 end
 
 #ADIの未知数X方向 定数Y方向 差分
-function calcStep2!(F_k12, F_kp21,k)
+function calcStep2!(F_k12, F_kp21,k, matN)
     #正確には、k+1とKの屈折率の平均を取るべきだと思うが、
     #今のところはk+1を抜き出す   
     return F_kp21
@@ -194,10 +193,10 @@ function main()
 
     for t in 1:N.t
         for k in 1:N.z-1
-            calcStep1!(F_k_1st, F_k_2nd, k)
-            calcStep2!(F_k_2nd, F_k_1st, k)
+            calcStep1!(F_k_1st, F_k_2nd, k, matN)
+            calcStep2!(F_k_2nd, F_k_1st, k, matN)
         end
-        @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
+    #    @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
     end
     "done"
 end
