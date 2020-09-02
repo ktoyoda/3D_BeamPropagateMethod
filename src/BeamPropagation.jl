@@ -10,6 +10,7 @@ using KTOptical
 using .Param
 using BenchmarkTools
 using JLD2
+
 #using FileIO
 # 計算条件###################
 #計算レンジ
@@ -97,6 +98,7 @@ function calcStep1!(F_k11, F_kp12,k)
         # Ax=BのA, z = k+1を作る。
         # mapでベクトルを作っておいて、diagmで対角行列にする。
         # bが位置によって値が異なるのでmapで対応。
+
         A = diagm(map(j -> b(i,j,k),1:N.y))
         A += diagm( 1 => map(j -> b(i,j,k),1:N.y-1))
         A += diagm(-1 => map(j -> b(i,j,k),1:N.y-1))
@@ -115,12 +117,12 @@ function calcStep1!(F_k11, F_kp12,k)
         #右端---------------------
         imKxR = (1/step.y)   * log(abs(F_k11[N.x,j]/F_k11[N.x-1,j]))
         reKxR = (1im/step.y) * log(abs(F_k11[N.x,j]/F_k11[N.x-1,j]*exp(-imKxR*step.y)))
-        if reKxL<0
-            reKxL = -1*reKxL
+        if reKxR<0
+            reKxR = -1*reKxR
         end
-        ηR = exp(1im* reKxL * step.y - imKxR* step.y)
+        ηR = exp(1im* reKxR * step.y - imKxR* step.y)
         
-        A[N.y,N.y] -= exp(-1im * kxl *(-step.y))
+        A[N.y,N.y] -= ηR/(step.y)^2
         #########################
         for j in 2:N.y-1
             B[i] = c*F_k11[N.y * j + i]+d*(F_k11[N.y*j + i-1]+F_k11[N.y*j + i+1])
@@ -128,8 +130,8 @@ function calcStep1!(F_k11, F_kp12,k)
 
         # 透明境界条件(TBC) for B#######
         # 参考文献 ●●● p.xxx
-        colBL = (2-ηL)/step.x^2 - (matN[i,j,k]-1.35^2)*k0^2 + (4im*matN[i,j,k]*k0)/step.z
-        colBR = (2-ηR)/step.x^2 - (matN[i,j,k]-1.35^2)*k0^2 + (4im*matN[i,j,k]*k0)/step.z
+        colBL = (2-ηL)/step.y^2 - (matN[i,j,k]-1.35^2)*k0^2 + (4im*matN[i,j,k]*k0)/step.z
+        colBR = (2-ηR)/step.y^2 - (matN[i,j,k]-1.35^2)*k0^2 + (4im*matN[i,j,k]*k0)/step.z
         colC = -1/(step.x)^2
         B[1] = -conj(colBL)*F_k11[1,j] - colC*F_k11[2,j]
         B[N.x] = -conj(colBR)*F_k11[N.x,j] - colC*F_k11[N.x-1,j]
