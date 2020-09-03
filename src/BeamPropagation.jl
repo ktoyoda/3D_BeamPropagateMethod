@@ -14,8 +14,7 @@ using JLD2
 #using FileIO
 # 計算条件###################
 #計算レンジ
-#um = params.um
-#um = params.um
+um = Param.um
 crange = Param.crange(x = 50um, y = 50um, z = 100um, t = 10)
 #計算ステップ
 step = Param.step(x = 0.25um, y = 0.25um, z = 0.25um)
@@ -158,10 +157,7 @@ end
 function showMode()
 end
 
-
-function boundary_set(u,k,array)
-end
-
+# 電界の初期条件
 @time function initial_set(M, B ,F0)
     KTOptical.setParam(B.w, 0, B.wavelength)
     x = range(-crange.x/2, crange.x/2 ,step = step.x)
@@ -169,6 +165,17 @@ end
 
     E = LG_I.(M.l, M.p,x,y')
     return E
+
+end
+
+# calcstep
+function renewN!(matN, E)
+    if size(matN) == size(E)
+        println("matN and E have different sizes.[renewE] ")
+        return 0
+    end
+
+    for matN 
 
 end
 
