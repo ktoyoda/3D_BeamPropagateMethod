@@ -20,19 +20,17 @@ function setNwaveguide!(N::Array{ComplexF64,3},xstep, ystep, zstep, diameter, an
         for (j,y_pos) in enumerate(yrange)
             for (k,z_pos) in enumerate(zrange)
                 #セパレート前
-                if k < Nz * starting_separate
-                    if x_pos^2 + y_pos^2 < diameter
+#                if k < Nz * starting_separate
+
+                    if x_pos^2 + y_pos^2 < diameter^2
                         N[i, j, k] = propN
-                    end
-                end
-                if k >= Nz * starting_separate
-                    if x_pos^2 + y_pos^2 < diameter
-                        N[i, j, k] = propN
+                    else 
+                        N[i, j, k] = baseN
                     end
                     #斜め方向にして正射影を取ればいいと思うんだけど、
                     #いまはまっすぐの導波路を作ろう。
                     #if (x_pos-angle*x_pos)
-                end
+                #end
             end
 
         end

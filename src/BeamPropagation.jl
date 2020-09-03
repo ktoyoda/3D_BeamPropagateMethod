@@ -7,29 +7,28 @@ include("propagator.jl")
 using LinearAlgebra
 using Plots
 using KTOptical
-using .Param
+using .Params
 using BenchmarkTools
 using JLD2
 
 #using FileIO
 # 計算条件###################
 #計算レンジ
-um = Param.um
-crange = Param.crange(x = 50um, y = 50um, z = 100um, t = 10)
+crange = Params.crange(x = 20um, y = 20um, z = 100um, t = 10)
 #計算ステップ
-step = Param.step(x = 0.25um, y = 0.25um, z = 0.25um)
-Nx = Int(crange.x / step.x)
-Ny = Int(crange.y / step.y)
-Nz = Int(crange.z / step.z)
-Nt = Int(crange.t / step.t)
-N = Param.N(Nx,Ny,Nz,Nt)
+steps = Params.steps(x = 2um, y = 2um, z = 5um)
+Nx = Int(crange.x / steps.x)
+Ny = Int(crange.y / steps.y)
+Nz = Int(crange.z / steps.z)
+Nt = Int(crange.t / steps.t)
+N = Params.N(Nx,Ny,Nz,Nt)
 
 #材料情報
-material = Param.materiarl(nb = 1.5, Δn0 = 0.01, τ = 0.1,α = 0)
-mode = Param.vortex_mode(l=1, p=0)
+material = Params.materiarl(nb = 1.5, Δn0 = 0.5, τ = 0.1,α = 0)
+mode = Params.vortex_mode(l=1, p=0)
 
 #ビーム情報
-beam = Param.beam(w = 20um, U0 = 100.0, wavelength = 1.064um)
+beam = Params.beam(w = 20um, U0 = 100.0, wavelength = 1.064um)
 
 println("計算環境")
 #versioninfo()
@@ -37,7 +36,7 @@ Pkg.status()
 
 println("計算条件")
 @show crange
-@show step
+@show steps
 @show N
 @show material
 @show mode
@@ -46,7 +45,6 @@ println("計算条件")
 println("//////////////////////////////")
 function returnPades(T::Integer,N::Integer)
 end
-
 
 # 
 # 2020/8/31
@@ -67,10 +65,10 @@ end
 #
 # BがN.yサイズのベクトル(z=kの係数)
 # 
-# 各A,Bに入る屈折率項は座標情報が必要である。
+###### 各A,Bに入る屈折率項は座標情報が必要である。
 # Aに入るのは()
 # 
-##F_k11 既知のビーム伝搬
+#F_k11 既知のビーム伝搬
 #F_kp12 未知のビーム伝搬の格納先(F_k+1/2)
 #k 今のZカウント
 # calcStep1は
@@ -83,14 +81,15 @@ end
 # Step1,Step2の組み合わせを複数回周回することになる。
 # t = n に関しては、
 # 上記で作った新しい屈折率マップをもとに、
-# 再度回していく。
+# 再度回していく。 	\1/2 
+
 
 function calcStep1!(F_k11, F_kp12,k,matN)
     k0 = 2π / beam.wavelength
-    a = -1/(step.y)^2
-    b(i,j,k) = 1im*4*k0*matN[i, j, k]/step.z + 2/step.y^2 - k0^2(matN[i, j, k]-1.35^2)/2
-    c = 1/(step.x)^2
-    d(i,j,k) = 1im*4*k0*matN[i, j, k]/step.z - 2/step.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
+    a = -1/(steps.y)^2
+    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]-1.35^2)/2
+    c = 1/(steps.x)^2
+    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
     B = zeros(ComplexF64,N.y,1)
 
     for i in 1:N.x
@@ -104,36 +103,40 @@ function calcStep1!(F_k11, F_kp12,k,matN)
 
         #透明境界条件(TBC) for A#######
         #左端---------------------
-        imKxL = -(1/step.y)   * log(abs(F_k11[i,2]/F_k11[i,1]))
-        reKxL = -(1im/step.y) * log(abs(F_k11[i,2]/F_k11[i,1]*exp(imKxL*step.y)))
+        imKxL = -(1/steps.y)   * log(abs(F_k11[i,2]/F_k11[i,1]))
+        reKxL = -(1im/steps.y) * log(abs(F_k11[i,2]/F_k11[i,1]*exp(imKxL*steps.y)))
         if real(reKxL)<0
             reKxL = -1*reKxL
         end
-        ηL = exp(1im* reKxL * step.y - imKxL*step.y)
+        ηL = exp(1im* reKxL * steps.y - imKxL*steps.y)
 
-        A[1,1] -= ηL/(step.y)^2
+        A[1,1] -= ηL/(steps.y)^2
 
         #右端---------------------
-        imKxR = (1/step.y)   * log(abs(F_k11[i,N.y-2]/F_k11[i,N.y-1]))
-        reKxR = (1im/step.y) * log(abs(F_k11[i,N.y-2]/F_k11[i,N.y-1]*exp(-imKxR*step.y)))
+        imKxR = (1/steps.y)   * log(abs(F_k11[i,N.y-2]/F_k11[i,N.y-1]))
+        reKxR = (1im/steps.y) * log(abs(F_k11[i,N.y-2]/F_k11[i,N.y-1]*exp(-imKxR*steps.y)))
         if real(reKxR)<0
             reKxR = -reKxR
         end
-        ηR = exp(1im* reKxR * step.y - imKxR* step.y)
-        A[N.y,N.y] -= ηR/(step.y)^2
+        ηR = exp(1im* reKxR * steps.y - imKxR* steps.y)
+        A[N.y,N.y] -= ηR/(steps.y)^2
         #########################
+        @show F_k11
         for j in 2:N.y-1
             B[i] = c*F_k11[N.y * j + i] + d(i,j,k)*F_k11[N.y*j + i-1] + d(i,j,k)* F_k11[N.y*j + i+1]
         end
 
         # 透明境界条件(TBC) for B#######
         # 参考文献 ●●● p.xxx
-        colBL = (2-ηL)/step.y^2 - (matN[i,1,k]-1.35^2)*k0^2 + (4im*matN[i,1,k]*k0)/step.z
-        colBR = (2-ηR)/step.y^2 - (matN[i,N.y,k]-1.35^2)*k0^2 + (4im*matN[i,N.y,k]*k0)/step.z
-        colC = -1/(step.x)^2
+        colBL = (2-ηL)/steps.y^2 - (matN[i,1,k]-1.35^2)*k0^2 + (4im*matN[i,1,k]*k0)/steps.z
+        colBR = (2-ηR)/steps.y^2 - (matN[i,N.y,k]-1.35^2)*k0^2 + (4im*matN[i,N.y,k]*k0)/steps.z
+        colC = -1/(steps.x)^2
+
         B[1] = -conj(colBL)*F_k11[i,1] - colC*F_k11[i,2]
         B[N.x] = -conj(colBR)*F_k11[i,N.y] - colC*F_k11[i,N.y-1]
         #########################
+        @show B
+        @show A
         F_kp12[i,:] = B\A
 
 
@@ -158,12 +161,14 @@ function showMode()
 end
 
 # 電界の初期条件
-@time function initial_set(M, B ,F0)
-    KTOptical.setParam(B.w, 0, B.wavelength)
-    x = range(-crange.x/2, crange.x/2 ,step = step.x)
-    y = range(-crange.y/2, crange.y/2 ,step = step.y)
+@time function initial_set(Mode, Beamparam ,F0)
+    KTOptical.setParam(Beamparam.w, 0, Beamparam.wavelength)
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    x = range(-crange.x/2, crange.x/2 - steps.x, length = N.x)
+    y = range(-crange.y/2, crange.y/2 -steps.x ,length = N.y)
 
-    E = LG_I.(M.l, M.p,x,y')
+    E = LG_I.(Mode.l, Mode.p,x,y')
     return E
 
 end
@@ -174,17 +179,16 @@ function renewN!(matN, E)
         println("matN and E have different sizes.[renewE] ")
         return 0
     end
-
-    for matN 
-
 end
 
 function main()
     #セル個数
     F0 = zeros(N.x, N.y, N.z)
+    @show size(F0)
     E = initial_set(mode, beam, F0)
     gr()
-    x = range(-crange.x/2, crange.x/2 ,step = step.x)
+    #!!!!!!!!!!!!!!!!!!!!!!!!
+    x = range(-crange.x/2, crange.x/2 ,step = steps.x)
 
     F_result = zeros(Float64,(N.x,N.y,N.z));
     #F_k_1stは現在のF_k
@@ -193,10 +197,17 @@ function main()
     F_k_1st = zeros(N.x, N.y)
     F_k_2nd = zeros(N.x, N.y)
     matN = zeros(ComplexF64,(N.x,N.y,N.z))
-    typeof(matN)
-    setNwaveguide!(matN, step.x, step.y, step.z, 4um, 0, material.nb, material.nb + material.Δn0, 0.5)
+    @show size(F0)
+    @show size(E)
+    @show size(F_k_1st[:,:,1])
+    F_k_1st[:,:,1] = E
+    setNwaveguide!(matN, steps.x, steps.y, steps.z, 5um, 0, material.nb, material.nb + material.Δn0, 0.5)
+    @show matN
     #左辺は更新されたF_k_1stが入る。
     # 
+
+    #初期条件を F_K_1st に入れる。
+
 
     for t in 1:N.t
         for k in 1:N.z-1
@@ -209,3 +220,8 @@ function main()
 end
 
 @time main()
+
+#TODO F_k11 がゼロのまま
+#TODO B[1] B[N.y]がNan
+#TODO A[1,1] A[N.y,N.y]がNan
+#TODO Eのサイズがおかしい

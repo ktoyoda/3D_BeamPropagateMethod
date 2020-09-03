@@ -6,7 +6,7 @@
 #negative value の累乗は.0を付ける
 
 # 実験条件####################
-module Param
+module Params
    export  m
    export  mm
    export  um
@@ -30,7 +30,7 @@ module Param
         z::Float64 = 20um
         t::Float64 = 10.0
     end
-    @with_kw struct step
+    @with_kw struct steps
         # セルのステップ（um
         x::Float64 = 0.1um
         y::Float64 = 0.1um
