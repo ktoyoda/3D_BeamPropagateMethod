@@ -1,22 +1,25 @@
 #計算に関係ないパッケージ
 using Pkg
-
-include("parameter.jl")
 include("propagator.jl")
+include("Params.jl")
 #計算に使うパッケージ
 using LinearAlgebra
 using Plots
-using KTOptical
-using .Params
+using KTOptical 
+# 自作のパッケージを使うときにはGithubにアップロードして、
+# GithubのHTTPSをadd $$HTTPS_URL$$する。
+# プライベートでよい。
+
 using BenchmarkTools
 using JLD2
-
+using Polynomials
+um = Params.um
 #using FileIO
 # 計算条件###################
 #計算レンジ
-crange = Params.crange(x = 20um, y = 20um, z = 100um, t = 10)
+crange = Params.crange(x = 20um, y = 20um, z = 100um, t = 0.1)
 #計算ステップ
-steps = Params.steps(x = 2um, y = 2um, z = 5um)
+steps = Params.steps(x = 2um, y = 2um, z = 5um, t = 0.1)
 Nx = Int(crange.x / steps.x)
 Ny = Int(crange.y / steps.y)
 Nz = Int(crange.z / steps.z)
@@ -44,6 +47,8 @@ println("計算条件")
 
 println("//////////////////////////////")
 function returnPades(T::Integer,N::Integer)
+    #Julia に型注釈は必要ないが、Padeの引数は整数型に限定したい。という説明
+
 end
 
 # 
@@ -68,7 +73,7 @@ end
 ###### 各A,Bに入る屈折率項は座標情報が必要である。
 # Aに入るのは()
 # 
-#F_k11 既知のビーム伝搬
+#F_k1 既知のビーム伝搬
 #F_kp12 未知のビーム伝搬の格納先(F_k+1/2)
 #k 今のZカウント
 # calcStep1は
@@ -84,62 +89,90 @@ end
 # 再度回していく。 	\1/2 
 
 
-function calcStep1!(F_k11, F_kp12,k,matN)
+
+function calcStep1!(F_k11, F_kp12, k, matN)
     k0 = 2π / beam.wavelength
+    Nref = 1.35
+    # a,b,cは左辺用
     a = -1/(steps.y)^2
-    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]-1.35^2)/2
+    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]^2 - Nref^2)/2
     c = 1/(steps.x)^2
-    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]-1.35^2)/2
+    
+    # d は 右辺用
+    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]^2 - Nref^2)/2
     B = zeros(ComplexF64,N.y,1)
 
+    # 各回 iを固定して、jxj　の行列を作って計算する。
+    # よって、最初のループは固定方向のx(i)で、
+    # 内部で、diagmで行列方向のN.y x N.y = jxjを作る。
     for i in 1:N.x
-        # Ax=BのA, z = k+1を作る。
+        # Ax=BのA (z = k+1 における係数行列)を作る。
         # mapでベクトルを作っておいて、diagmで対角行列にする。
         # bが位置によって値が異なるのでmapで対応。
-
+        # diagmは配列を正方行列の対角に配置する。
+        # pair（=>) でズレを表現できる。
         A = diagm(map(j -> b(i,j,k),1:N.y))
-        A += diagm( 1 => map(j -> b(i,j,k),1:N.y-1))
-        A += diagm(-1 => map(j -> b(i,j,k),1:N.y-1))
+        A += diagm(1 => fill(c,N.y-1))
+        A += diagm(-1 => fill(a,N.y-1))
 
         #透明境界条件(TBC) for A#######
+        # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
         #左端---------------------
         imKxL = -(1/steps.y)   * log(abs(F_k11[i,2]/F_k11[i,1]))
         reKxL = -(1im/steps.y) * log(abs(F_k11[i,2]/F_k11[i,1]*exp(imKxL*steps.y)))
-        if real(reKxL)<0
-            reKxL = -1*reKxL
-        end
-        ηL = exp(1im* reKxL * steps.y - imKxL*steps.y)
 
+        # reKxLおよびreKxRが負の時、
+        # 左貝だと符号逆転させて、藪だと0にすると書いてある。前者のほうがそれっぽい気がする。
+        if real(reKxL)<0
+            reKxL = -1*reKxL      #左貝方式
+            # reKxL = 0           #藪方式
+        end
+        ###!!!ηLの計算違う？左貝144p。どっちが正解？１
+        #ηL = exp(1im* reKxL * steps.y - imKxL*steps.y)
+        ηL = exp(1im* (reKxL+ imKxL) *steps.y)
+        
+        ###!!! ここA[1,1]か？ ← 1,1でいい
+        ###!!! 左貝(7.25b)と(7,37a)比較して 差分をとる。
         A[1,1] -= ηL/(steps.y)^2
 
         #右端---------------------
-        imKxR = (1/steps.y)   * log(abs(F_k11[i,N.y-2]/F_k11[i,N.y-1]))
-        reKxR = (1im/steps.y) * log(abs(F_k11[i,N.y-2]/F_k11[i,N.y-1]*exp(-imKxR*steps.y)))
-        if real(reKxR)<0
-            reKxR = -reKxR
-        end
-        ηR = exp(1im* reKxR * steps.y - imKxR* steps.y)
-        A[N.y,N.y] -= ηR/(steps.y)^2
-        #########################
-        @show F_k11
-        for j in 2:N.y-1
-            B[i] = c*F_k11[N.y * j + i] + d(i,j,k)*F_k11[N.y*j + i-1] + d(i,j,k)* F_k11[N.y*j + i+1]
-        end
+        imKxR = (1/steps.y) * log(abs(F_k11[i,N.y]/F_k11[i,N.y-1]))
+        reKxR = (1im/steps.y) * log(abs(F_k11[i,N.y-1]/F_k11[i,N.y]*exp(-imKxR*steps.y)))
 
+        if real(reKxR)<0
+            reKxR = -reKxR      #左貝方式
+            # reKxR = 0           #藪方式
+        end
+        ηR = exp(1im* (reKxR + imKxR) * steps.y)
+        A[N.y,N.y] -= ηR/(steps.y)^2
+
+        #########################
+
+        
         # 透明境界条件(TBC) for B#######
-        # 参考文献 ●●● p.xxx
-        colBL = (2-ηL)/steps.y^2 - (matN[i,1,k]-1.35^2)*k0^2 + (4im*matN[i,1,k]*k0)/steps.z
-        colBR = (2-ηR)/steps.y^2 - (matN[i,N.y,k]-1.35^2)*k0^2 + (4im*matN[i,N.y,k]*k0)/steps.z
+        colBL = (2-ηL)/steps.y^2 - (matN[i,1,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+        colBR = (2-ηR)/steps.y^2 - (matN[i,N.y,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
         colC = -1/(steps.x)^2
 
-        B[1] = -conj(colBL)*F_k11[i,1] - colC*F_k11[i,2]
-        B[N.x] = -conj(colBR)*F_k11[i,N.y] - colC*F_k11[i,N.y-1]
+        #@show F_k11
+
+        for j in 1:N.y
+            if i == 1
+                B[j] = -conj(colBL)*F_k11[1,j] - colC*F_k11[2,j]
+            elseif i == N.x
+                B[j] = -conj(colBR)*F_k11[N.x,j] - colC*F_k11[N.x-1,j]
+            else
+                B[j] = c*F_k11[i,j] + d(i,j,k)*F_k11[i-1,j] + d(i,j,k)* F_k11[i+1,j]
+            end
+        end
+
+        
         #########################
-        @show B
-        @show A
+        println( "////////////////////////////////////////////////////////////" )
+#       @show B
+#       @show A
         F_kp12[i,:] = B\A
-
-
+        #F_kp12[]を使って、新しい屈折率マップを作る。
 
     end
     return F_kp12
@@ -149,8 +182,96 @@ end
 function calcStep2!(F_k12, F_kp21,k, matN)
     #正確には、k+1とKの屈折率の平均を取るべきだと思うが、
     #今のところはk+1を抜き出す   
+    k0 = 2π / beam.wavelength
+    Nref = 1.35
+    # a,b,cは左辺用
+    a = -1/(steps.y)^2
+    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]^2 - Nref^2)/2
+    c = 1/(steps.x)^2
+    
+    # d は 右辺用
+    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]^2 - Nref^2)/2
+    B = zeros(ComplexF64,N.y,1)
+
+    # 各回 iを固定して、jxj　の行列を作って計算する。
+    # よって、最初のループは固定方向のx(i)で、
+    # 内部で、diagmで行列方向のN.y x N.y = jxjを作る。
+    for i in 1:N.x
+        # Ax=BのA (z = k+1 における係数行列)を作る。
+        # mapでベクトルを作っておいて、diagmで対角行列にする。
+        # bが位置によって値が異なるのでmapで対応。
+        # diagmは配列を正方行列の対角に配置する。
+        # pair（=>) でズレを表現できる。
+        A = diagm(map(j -> b(i,j,k),1:N.y))
+        A += diagm(1 => fill(c,N.y-1))
+        A += diagm(-1 => fill(a,N.y-1))
+
+        #透明境界条件(TBC) for A#######
+        # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
+        #左端---------------------
+        imKxL = -(1/steps.y)   * log(abs(F_k11[i,2]/F_k11[i,1]))
+        reKxL = -(1im/steps.y) * log(abs(F_k11[i,2]/F_k11[i,1]*exp(imKxL*steps.y)))
+
+        # reKxLおよびreKxRが負の時、
+        # 左貝だと符号逆転させて、藪だと0にすると書いてある。前者のほうがそれっぽい気がする。
+        if real(reKxL)<0
+            reKxL = -1*reKxL      #左貝方式
+            # reKxL = 0           #藪方式
+        end
+        ###!!!ηLの計算違う？左貝144p。どっちが正解？１
+        #ηL = exp(1im* reKxL * steps.y - imKxL*steps.y)
+        ηL = exp(1im* (reKxL+ imKxL) *steps.y)
+        
+        ###!!! ここA[1,1]か？ ← 1,1でいい
+        ###!!! 左貝(7.25b)と(7,37a)比較して 差分をとる。
+        A[1,1] -= ηL/(steps.y)^2
+
+        #右端---------------------
+        imKxR = (1/steps.y) * log(abs(F_k11[i,N.y]/F_k11[i,N.y-1]))
+        reKxR = (1im/steps.y) * log(abs(F_k11[i,N.y-1]/F_k11[i,N.y]*exp(-imKxR*steps.y)))
+
+        if real(reKxR)<0
+            reKxR = -reKxR      #左貝方式
+            # reKxR = 0           #藪方式
+        end
+        ηR = exp(1im* (reKxR + imKxR) * steps.y)
+        A[N.y,N.y] -= ηR/(steps.y)^2
+
+        #########################
+
+        
+        # 透明境界条件(TBC) for B#######
+        colBL = (2-ηL)/steps.y^2 - (matN[i,1,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+        colBR = (2-ηR)/steps.y^2 - (matN[i,N.y,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+        colC = -1/(steps.x)^2
+
+        #@show F_k11
+
+        for j in 1:N.y
+            if i == 1
+                B[j] = -conj(colBL)*F_k11[1,j] - colC*F_k11[2,j]
+            elseif i == N.x
+                B[j] = -conj(colBR)*F_k11[N.x,j] - colC*F_k11[N.x-1,j]
+            else
+                B[j] = c*F_k11[i,j] + d(i,j,k)*F_k11[i-1,j] + d(i,j,k)* F_k11[i+1,j]
+            end
+        end
+
+        
+        #########################
+        println( "////////////////////////////////////////////////////////////" )
+#       @show B
+#       @show A
+        F_kp12[i,:] = B\A
+        #F_kp12[]を使って、新しい屈折率マップを作る。
+
+    end
+    return F_kp12
+end
+
     return F_kp21
 end
+
 
 function retN()
     return 1
@@ -166,9 +287,9 @@ end
     #!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     x = range(-crange.x/2, crange.x/2 - steps.x, length = N.x)
-    y = range(-crange.y/2, crange.y/2 -steps.x ,length = N.y)
-
+    y = range(-crange.y/2, crange.y/2 - steps.y ,length = N.y)
     E = LG_I.(Mode.l, Mode.p,x,y')
+    plot()
     return E
 
 end
@@ -184,7 +305,7 @@ end
 function main()
     #セル個数
     F0 = zeros(N.x, N.y, N.z)
-    @show size(F0)
+#    @show size(F0)
     E = initial_set(mode, beam, F0)
     gr()
     #!!!!!!!!!!!!!!!!!!!!!!!!
@@ -194,8 +315,8 @@ function main()
     #F_k_1stは現在のF_k
     #F_k_2ndは更新されたF_k
     @show N.x * N.y, N.x* N.y
-    F_k_1st = zeros(N.x, N.y)
-    F_k_2nd = zeros(N.x, N.y)
+    F_k_1st = zeros(ComplexF64, N.x, N.y) #Zerosに型指定忘れないこと！！！
+    F_k_2nd = zeros(ComplexF64, N.x, N.y)
     matN = zeros(ComplexF64,(N.x,N.y,N.z))
     @show size(F0)
     @show size(E)
@@ -204,14 +325,17 @@ function main()
     setNwaveguide!(matN, steps.x, steps.y, steps.z, 5um, 0, material.nb, material.nb + material.Δn0, 0.5)
     @show matN
     #左辺は更新されたF_k_1stが入る。
-    # 
+    # S
 
     #初期条件を F_K_1st に入れる。
 
 
     for t in 1:N.t
         for k in 1:N.z-1
+            # x 固定、　y方向移動
+            @show t,k
             calcStep1!(F_k_1st, F_k_2nd, k, matN)
+            # y 固定、　x
             calcStep2!(F_k_2nd, F_k_1st, k, matN)
         end
     #    @save "/savefile/F_"* string(t)*".jld2" F_k_2nd

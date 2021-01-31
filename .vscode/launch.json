@@ -11,7 +11,7 @@
             "name": "Run active Julia file",
             "program": "${file}",
             "stopOnEntry": false,
-            "cwd": "C:\\Users\\KTOYODA\\OneDrive\\Programming\\julia\\Gel_GoldDoped\\",
+            "cwd": "C:\\Users\\KTOYODA\\OneDrive\\Programming\\julia\\３Dビーム伝搬法\\",
             "juliaEnv": "${command:activeJuliaEnvironment}"
         }
     ]
