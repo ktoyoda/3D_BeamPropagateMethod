@@ -17,9 +17,9 @@ um = Params.um
 #using FileIO
 # 計算条件###################
 #計算レンジ
-crange = Params.crange(x = 20um, y = 20um, z = 100um, t = 0.1)
+crange = Params.crange(x = 20um, y = 20um, z = 10um, t = 0.1)
 #計算ステップ
-steps = Params.steps(x = 0.5um, y = 0.5um, z = 1um, t = 0.1)
+steps = Params.steps(x = 1um, y = 1um, z = 1um, t = 0.1)
 Nx = Int(crange.x / steps.x)
 Ny = Int(crange.y / steps.y)
 Nz = Int(crange.z / steps.z)
@@ -168,9 +168,7 @@ function calcStep1!(F_k_before, F_k_after, k, matN)
 
         
         #########################
-#        println( "////////////////////////////////////////////////////////////" )
-#       @show B
-#       @show A
+
         F_k_after[i,:] = B\A
         #F_k_after[]を使って、新しい屈折率マップを作る。
 
@@ -255,9 +253,7 @@ function calcStep2!(F_k_before, F_k_after,k, matN)
         end
 
         #########################
-#       println( "////////////////////////////////////////////////////////////" )
-#       @show B
-#       @show A
+
         F_k_after[:,j] = B\A
         #F_k_after[]を使って、新しい屈折率マップを作る。
 
@@ -274,10 +270,9 @@ function showMode()
 end
 
 # 電界の初期条件
-@time function initial_set(Mode, Beamparam ,F0)
+function initial_set(Mode, Beamparam ,F0)
     KTOptical.setParam(Beamparam.w, 0, Beamparam.wavelength)
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
+
     x = range(-crange.x/2, crange.x/2 - steps.x, length = N.x)
     y = range(-crange.y/2, crange.y/2 - steps.y ,length = N.y)
     E = LG_E.(Mode.l, Mode.p, x, y')
@@ -286,12 +281,7 @@ end
 
 end
 
-# calcstep
-function renewN!(matN, E)
-    if size(matN) == size(E)
-        println("matN and E have different sizes.[renewE] ")
-        return 0
-    end
+function renewN!(matN, E3d)
 end
 
 function main()
@@ -302,6 +292,8 @@ function main()
     gr()
     #!!!!!!!!!!!!!!!!!!!!!!!!
     x = range(-crange.x/2, crange.x/2 ,step = steps.x)
+    y = range(-crange.y/2, crange.y/2 ,step = steps.y)
+    z = range(-crange.z/2, crange.z/2 ,step = steps.z)
 
     F_result = zeros(ComplexF64,(N.x,N.y,N.z));
     #F_k_1stは現在のF_k
@@ -315,7 +307,8 @@ function main()
     @show size(F_k_1st[:,:,1])
     F_k_1st[:,:,1] = E
     setNwaveguide!(matN, steps.x, steps.y, steps.z, 5um, 0, material.nb, material.nb + material.Δn0, 0.5)
-    # @show matN
+    #@show matN
+    
     #左辺は更新されたF_k_1stが入る。
     # S
     #初期条件を F_K_1st に入れる。
@@ -327,16 +320,22 @@ function main()
             # x 固定、　y方向移動
             @show t,k
             calcStep1!(F_k_1st, F_k_2nd, k, matN)
-#           println("calcstep1 done", k)
             # y 固定、　x方向移動
             calcStep2!(F_k_2nd, F_k_1st, k, matN)
-#            println("calcstep2 done", k)
             F_result[:,:,k] = F_k_1st
         end
     #    @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
     end
     # @show F_result
-    "done"
+    println("calc done")
+    println("plotting.....") 
+    Ezx = abs.(F_result[2, :, :]).^2
+    @show Ezx
+    p1 = contourf(x, z, Ezx )
+    display(p1)
+    #//////////////////////////////////////////////////////////////////////
+
+
 end
 
 @time main()

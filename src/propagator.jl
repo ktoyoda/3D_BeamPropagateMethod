@@ -22,7 +22,7 @@ function setNwaveguide!(N::Array{ComplexF64,3},xstep, ystep, zstep, diameter, an
                 #セパレート前
 #                if k < Nz * starting_separate
 
-                    if x_pos^2 + y_pos^2 < diameter^2
+                    if x_pos^2 + y_pos^2 < (diameter/2)^2 
                         N[i, j, k] = propN
                     else 
                         N[i, j, k] = baseN
