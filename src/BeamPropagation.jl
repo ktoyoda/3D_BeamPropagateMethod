@@ -17,21 +17,21 @@ um = Params.um
 #using FileIO
 # 計算条件###################
 #計算レンジ
-crange = Params.crange(x = 20um, y = 20um, z = 10um, t = 0.1)
+crange = Params.crange(x = 20um, y = 20um, z = 250um, t = 0.1)
 #計算ステップ
 steps = Params.steps(x = 1um, y = 1um, z = 1um, t = 0.1)
-Nx = Int(crange.x / steps.x)
-Ny = Int(crange.y / steps.y)
-Nz = Int(crange.z / steps.z)
-Nt = Int(crange.t / steps.t)
+Nx = Int(floor(crange.x / steps.x))
+Ny = Int(floor(crange.y / steps.y))
+Nz = Int(floor(crange.z / steps.z))
+Nt = Int(floor(crange.t / steps.t))
 N = Params.N(Nx,Ny,Nz,Nt)
 
 #材料情報
-material = Params.materiarl(nb = 1.5, Δn0 = 0.2, τ = 0.1,α = 0)
-mode = Params.vortex_mode(l=1, p=0)
+material = Params.materiarl(nb = 1.504, Δn0 = -0.004, τ = 0.1,α = 0)
+mode = Params.gauss_mode(0,0)
 
 #ビーム情報
-beam = Params.beam(w = 2um, U0 = 100.0, wavelength = 1.064um)
+beam = Params.beam(w = 2um, U0 = 0.001, wavelength = 1.064um)
 
 println("計算環境")
 #versioninfo()
@@ -47,7 +47,7 @@ println("計算条件")
 
 #println("//////////////////////////////")
 function returnPades(T::Integer,N::Integer)
-    #Julia に型注釈は必要ないが、Padeの引数は整数型に限定したい。という説明
+    #Julia に型注釈は必要ないが、Padeの数は整数型に限定したい。という説明
 
 end
 
@@ -90,22 +90,23 @@ end
 
 
 
-function calcStep1!(F_k_before, F_k_after, k, matN)
+function calcStep1!(F_k_before, F_k_after, k, matN,Nref)
+
     k0 = 2π / beam.wavelength
-    Nref = 1.35
     # a,b,cは左辺用
     a = -1/(steps.y)^2
-    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]^2 - Nref^2)/2
-    c = 1/(steps.x)^2
+    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]^2 - Nref^2)
+    c = 1/(steps.y)^2
     
     # d は 右辺用
-    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]^2 - Nref^2)/2
+    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]^2 - Nref^2)
     B = zeros(ComplexF64,N.y,1)
 
     # 各回 iを固定して、jxj　の行列を作って計算する。
     # よって、最初のループは固定方向のx(i)で、
     # 内部で、diagmで行列方向のN.y x N.y = jxjを作る。
     for i in 1:N.x
+
         # Ax=BのA (z = k+1 における係数行列)を作る。
         # mapでベクトルを作っておいて、diagmで対角行列にする。
         # bが位置によって値が異なるのでmapで対応。
@@ -118,33 +119,40 @@ function calcStep1!(F_k_before, F_k_after, k, matN)
         #透明境界条件(TBC) for A#######
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
         #左端---------------------
-        imKxL = -(1/steps.y)   * log(abs(F_k_before[i,2]/F_k_before[i,1]))
-        reKxL = -(1im/steps.y) * log(abs(F_k_before[i,2]/F_k_before[i,1]*exp(imKxL*steps.y)))
+        # 左貝7.29
+        imKxL = -(1/steps.y)   * log(F_k_before[i,2]/F_k_before[i,1])
+        reKxL = -(1im/steps.y) * log(F_k_before[i,2]/F_k_before[i,1]*exp(imKxL*steps.y))
 
         # reKxLおよびreKxRが負の時、
         # 左貝だと符号逆転させて、藪だと0にすると書いてある。前者のほうがそれっぽい気がする。
         if real(reKxL)<0
             reKxL = -1*reKxL      #左貝方式
-            # reKxL = 0           #藪方式
+            #reKxL = 0           #藪方式
         end
         ###!!!ηLの計算違う？左貝144p。どっちが正解？１
+        #左貝7.28
         #ηL = exp(1im* reKxL * steps.y - imKxL*steps.y)
-        ηL = exp(1im* (reKxL+ imKxL) *steps.y)
+        ηL = exp(1im* (reKxL+ 1im*imKxL) *steps.y)
 
         ###!!! ここA[1,1]か？ ← 1,1でいい
         ###!!! 左貝(7.25b)と(7,37a)比較して 差分をとる。
-        A[1,1] -= ηL/(steps.y)^2
+        A[1,1] += ηL/(steps.y)^2
 
         #右端---------------------
-        imKxR = (1/steps.y) * log(abs(F_k_before[i,N.y]/F_k_before[i,N.y-1]))
-        reKxR = (1im/steps.y) * log(abs(F_k_before[i,N.y-1]/F_k_before[i,N.y]*exp(-imKxR*steps.y)))
+        #左貝7.35
+        imKxR = (1/steps.y) * log(F_k_before[i,N.y]/F_k_before[i,N.y-1])
+        reKxR = (1im/steps.y) * log(F_k_before[i,N.y]/F_k_before[i,N.y-1]*exp(-imKxR*steps.y))
 
         if real(reKxR)<0
-            reKxR = -reKxR      #左貝方式
-            # reKxR = 0           #藪方式
+            #reKxR = -reKxR      #左貝方式
+            reKxR = 0           #藪方式
         end
-        ηR = exp(1im* (reKxR + imKxR) * steps.y)
-        A[N.y,N.y] -= ηR/(steps.y)^2
+        
+        #ηR = exp(1im* reKxR * steps.y - imKxR*steps.x)
+        ηR = exp(1im* (reKxR + 1im*imKxR) * steps.y)
+        #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
+        
+        A[N.y,N.y] += ηR/(steps.y)^2
 
         #########################
 
@@ -157,12 +165,16 @@ function calcStep1!(F_k_before, F_k_after, k, matN)
         #@show F_k_before
 
         for j in 1:N.y
+            if matN[i,j,k] != 1.5
+                @show i,j,k,matN[i,j,k]
+            end
             if i == 1
                 B[j] = -conj(colBL)*F_k_before[1,j] - colC*F_k_before[2,j]
             elseif i == N.x
                 B[j] = -conj(colBR)*F_k_before[N.x,j] - colC*F_k_before[N.x-1,j]
             else
-                B[j] = c*F_k_before[i,j] + d(i,j,k)*F_k_before[i-1,j] + d(i,j,k)* F_k_before[i+1,j]
+                #B[j] = c*F_k_before[i,j] + d(i,j,k)*F_k_before[i-1,j] + d(i,j,k)* F_k_before[i+1,j]
+                B[j] = a*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + c*F_k_before[i,j]
             end
         end
 
@@ -177,18 +189,20 @@ function calcStep1!(F_k_before, F_k_after, k, matN)
 end
 
 #ADIの未知数X方向 定数Y方向 差分
-function calcStep2!(F_k_before, F_k_after,k, matN)
+function calcStep2!(F_k_before, F_k_after,k, matN,Nref)
     #正確には、k+1とKの屈折率の平均を取るべきだと思うが、
     #今のところはk+1を抜き出す   
     k0 = 2π / beam.wavelength
-    Nref = 1.35
     # a,b,cは左辺用
+    # 左貝(7.25a)
     a = -1/(steps.x)^2
-    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.x^2 - k0^2(matN[i, j, k]^2 - Nref^2)/2
-    c = 1/(steps.y)^2
+    # 左貝(7.25b)
+    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.x^2 - k0^2(matN[i, j, k]^2 - Nref^2)
+    # 左貝(7.25a)
+    c = -1/(steps.x)^2
     
     # d は 右辺用
-    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.y^2 + k0^2(matN[i, j, k]^2 - Nref^2)/2
+    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.y^2 + k0^2(matN[i, j, k]^2 - Nref^2)
     B = zeros(ComplexF64,N.x,1)
 
     for j in 1:N.y
@@ -203,34 +217,42 @@ function calcStep2!(F_k_before, F_k_after,k, matN)
 
         #透明境界条件(TBC) for A#######
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
-        #端---------------------
-        imKxL = -(1/steps.x)   * log(abs(F_k_before[2,j]/F_k_before[1,j]))
-        reKxL = -(1im/steps.x) * log(abs(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x)))
+        #左端---------------------
+        #左貝(7.29)
+        imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
+        reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
 
         # reKxLおよびreKxRが負の時、
         # 左貝だと符号逆転させて、藪だと0にすると書いてある。前者のほうがそれっぽい気がする。
         if real(reKxL)<0
             reKxL = -1*reKxL      #左貝方式
-            # reKxL = 0           #藪方式
+            #reKxL = 0           #藪方式
         end
-        ###!!!ηLの計算違う？左貝144p。どっちが正解？１
-        #ηL = exp(1im* reKxL * steps.y - imKxL*steps.x)
-        ηL = exp(1im* (reKxL+ imKxL) *steps.x)
-        
-        ###!!! ここA[1,1]か？ ← 1,1でいい
+
+        #(左貝7.28)
+        #ηL = exp(1im* reKxL * steps.x - imKxL*steps.x)
+        ηL = exp(1im* (reKxL+ 1im*imKxL) *steps.x)
+        #ηL = 1/exp(1im* reKxL * steps.x - imKxL*steps.x)
         ###!!! 左貝(7.25b)と(7,37a)比較して 差分をとる。
-        A[1,1] -= ηL/(steps.x)^2
+        A[1,1] += ηL/(steps.x)^2
 
         #右端---------------------
-        imKxR = (1/steps.x) * log(abs(F_k_before[N.x, j]/F_k_before[N.x-1, j]))
-        reKxR = (1im/steps.x) * log(abs(F_k_before[N.x-1, j]/F_k_before[N.x, j]*exp(-imKxR*steps.y)))
+        # 左貝(7.35)
+        imKxR = (1/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
+        reKxR = (1im/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j]*exp(-imKxR*steps.y))
 
-        if real(reKxR)<0
+        # 進行波なら、F_k_before[N.x-1, j] > F_k_before[N.x, j]となるべき。
+        # つまり
+        if real(reKxR)>0
             reKxR = -reKxR      #左貝方式
             # reKxR = 0           #藪方式
         end
-        ηR = exp(1im* (reKxR + imKxR) * steps.y)
-        A[N.x, N.x] -= ηR/(steps.x)^2
+
+        #ηR = exp(1im* reKxR * steps.y - imKxR*steps.x)
+        #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
+        
+        ηR = exp(1im* (reKxR + 1im*imKxR) * steps.y)
+        A[N.x, N.x] += ηR/(steps.x)^2
 
         #########################
 
@@ -238,7 +260,7 @@ function calcStep2!(F_k_before, F_k_after,k, matN)
         # 透明境界条件(TBC) for B#######
         colBL = (2-ηL)/steps.x^2 - (matN[1, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
         colBR = (2-ηR)/steps.x^2 - (matN[N.x, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-        colC = -1/(steps.y)^2
+        colC = -1/(steps.x)^2
 
         #@show F_k_before
 
@@ -248,7 +270,8 @@ function calcStep2!(F_k_before, F_k_after,k, matN)
             elseif j == N.y
                 B[i] = -conj(colBR)*F_k_before[i,N.y] - colC*F_k_before[i,N.y-1]
             else
-                B[i] = c*F_k_before[i, j] + d(i, j, k)*F_k_before[i,j-1] + d(i,j,k)* F_k_before[i,j+1]
+                #B[i] = c*F_k_before[i, j] + d(i, j, k)*F_k_before[i,j-1] + d(i,j,k)* F_k_before[i,j+1]
+                B[i] = a*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + c*F_k_before[i,j]
             end
         end
 
@@ -275,7 +298,9 @@ function initial_set(Mode, Beamparam ,F0)
 
     x = range(-crange.x/2, crange.x/2 - steps.x, length = N.x)
     y = range(-crange.y/2, crange.y/2 - steps.y ,length = N.y)
-    E = LG_E.(Mode.l, Mode.p, x, y')
+
+    #ここをLG_E HG_Eののなんかラッパ的な奴にできない？
+    E = HG_E.(Mode.m, Mode.n, x, y')
     #plot()
     return E
 
@@ -291,9 +316,9 @@ function main()
     E = initial_set(mode, beam, F0)
     gr()
     #!!!!!!!!!!!!!!!!!!!!!!!!
-    x = range(-crange.x/2, crange.x/2 ,step = steps.x)
-    y = range(-crange.y/2, crange.y/2 ,step = steps.y)
-    z = range(-crange.z/2, crange.z/2 ,step = steps.z)
+    x = range(-crange.x/2, crange.x/2 ,length = N.x)
+    y = range(-crange.y/2, crange.y/2 ,length = N.y)
+    z = range(-crange.z/2, crange.z/2 ,length = N.z)
 
     F_result = zeros(ComplexF64,(N.x,N.y,N.z));
     #F_k_1stは現在のF_k
@@ -312,16 +337,16 @@ function main()
     #左辺は更新されたF_k_1stが入る。
     # S
     #初期条件を F_K_1st に入れる。
-
+    Nref = 1.5
 
     for t in 1:N.t
         @show "Zmax:", N.z
         for k in 1:N.z
             # x 固定、　y方向移動
             @show t,k
-            calcStep1!(F_k_1st, F_k_2nd, k, matN)
+            calcStep1!(F_k_1st, F_k_2nd, k, matN,Nref)
             # y 固定、　x方向移動
-            calcStep2!(F_k_2nd, F_k_1st, k, matN)
+            calcStep2!(F_k_2nd, F_k_1st, k, matN,Nref)
             F_result[:,:,k] = F_k_1st
         end
     #    @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
@@ -329,12 +354,17 @@ function main()
     # @show F_result
     println("calc done")
     println("plotting.....") 
-    Ezx = abs.(F_result[2, :, :]).^2
-    @show Ezx
-    p1 = contourf(x, z, Ezx )
+    Ezx = abs.(F_result[Int(floor(N.y/2)),: , :])
+#  @show Ezx
+    @show typeof(Ezx)
+    p1 = contourf(Ezx,levels = 200,clim = (0,maximum(Ezx)/10))
+    @show maximum(abs.(F_result[:, :, :]))
+    @show maximum(Ezx)
     display(p1)
+    p2 = plot(Ezx[Int(floor(N.y/2)),:])
+    display(p2)
+#    p2 = contourf()
     #//////////////////////////////////////////////////////////////////////
-
 
 end
 

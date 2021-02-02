@@ -62,7 +62,11 @@ module Params
         n::Int8 = 0
     end
     @with_kw struct vortex_mode
+        # userはl,pで代入するが、
+        # m,nのフィールドも持っておき、コードライティング中では、m,nでやらせる。
         l::Int8 = 1
         p::Int8 = 0
+        m = l
+        n = p
     end
 end
