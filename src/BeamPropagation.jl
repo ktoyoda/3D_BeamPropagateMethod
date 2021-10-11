@@ -1,3 +1,4 @@
+
 #計算に関係ないパッケージ
 using Pkg
 include("propagator.jl")
@@ -126,8 +127,8 @@ function calcStep1!(F_k_before, F_k_after, k, matN,Nref)
         # reKxLおよびreKxRが負の時、
         # 左貝だと符号逆転させて、藪だと0にすると書いてある。前者のほうがそれっぽい気がする。
         if real(reKxL)<0
-            reKxL = -1*reKxL      #左貝方式
-            #reKxL = 0           #藪方式
+            #reKxL = -1*reKxL      #左貝方式
+            reKxL = 0           #藪方式
         end
         ###!!!ηLの計算違う？左貝144p。どっちが正解？１
         #左貝7.28
