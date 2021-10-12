@@ -1,0 +1,23 @@
+{
+    "name": "Julia",
+    "context": "..",
+    "dockerFile": "Dockerfile",
+
+    // Set *default* container specific settings.json values on container create.
+    "settings": { 
+        "workbench.editor.enablePreview":false,
+        "julia.usePlotPane": true,
+        "julia.liveTestFile": "test/runtests.jl"
+    },
+
+    // Add the IDs of extensions you want installed when the container is created.
+    "extensions": [
+        "julialang.language-julia",
+        "shd101wyy.markdown-preview-enhanced",
+        "donjayamanne.githistory",
+        "eamodio.gitlens",
+        "aaron-bond.better-comments",
+        "ms-azuretools.vscode-docker",
+        "takanotume24.pdf",
+    ],
+}
