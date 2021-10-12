@@ -47,10 +47,10 @@ module Params
         t::Int64
     end
     @with_kw struct materiarl
-        nb::Float64 =1.5
-        Δn0::Float64 = 0.03
-        τ::Float64 = 0.1
-        α::Float64 = 0.0
+        nb::Float64 =1.5    # 背景屈折率
+        Δn0::Float64 = 0.03 # 外場入力時の屈折率変化
+        τ::Float64 = 0.1    # 遅延時間
+        α::Float64 = 0.0    # 吸収率
     end
     @with_kw struct beam
         w::Float64 = 3um

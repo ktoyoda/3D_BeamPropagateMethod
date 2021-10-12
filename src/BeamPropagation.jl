@@ -18,9 +18,9 @@ um = Params.um
 #using FileIO
 # 計算条件###################
 #計算レンジ
-crange = Params.crange(x = 20um, y = 20um, z = 250um, t = 0.1)
+crange = Params.crange(x = 20um, y = 20um, z = 150um, t = 0.1)
 #計算ステップ
-steps = Params.steps(x = 1um, y = 1um, z = 1um, t = 0.1)
+steps = Params.steps(x = 0.1um, y = 0.1um, z = 0.1um, t = 0.1)
 Nx = Int(floor(crange.x / steps.x))
 Ny = Int(floor(crange.y / steps.y))
 Nz = Int(floor(crange.z / steps.z))
@@ -89,18 +89,21 @@ end
 # 上記で作った新しい屈折率マップをもとに、
 # 再度回していく。 	\1/2 
 
-
+# テキスト中nr と nについて
+# 
 
 function calcStep1!(F_k_before, F_k_after, k, matN,Nref)
 
     k0 = 2π / beam.wavelength
     # a,b,cは左辺用
-    a = -1/(steps.y)^2
-    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]^2 - Nref^2)
-    c = 1/(steps.y)^2
+    ay = -1/(steps.y)^2
+    b(i,j,k) = 1im*4*k0*Nref/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]^2 - Nref^2)
+    cy = -1/(steps.y)^2
     
-    # d は 右辺用
-    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]^2 - Nref^2)
+    # d は 右辺用。 F_k1/2ijの係数
+    ax = -1/(steps.x)^2
+    d(i,j,k) = 1im*4*k0*Nref/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]^2 - Nref^2)
+    cx = -1/(steps.x)^2
     B = zeros(ComplexF64,N.y,1)
 
     # 各回 iを固定して、jxj　の行列を作って計算する。
@@ -114,10 +117,10 @@ function calcStep1!(F_k_before, F_k_after, k, matN,Nref)
         # diagmは配列を正方行列の対角に配置する。
         # pair（=>) でズレを表現できる。
         A = diagm(map(j -> b(i,j,k),1:N.y))
-        A += diagm(1 => fill(c,N.y-1))
-        A += diagm(-1 => fill(a,N.y-1))
+        A += diagm(1 => fill(cy,N.y-1))
+        A += diagm(-1 => fill(ay,N.y-1))
 
-        #透明境界条件(TBC) for A#######
+        #透明境界条件(TBC) for A#######--------------------------------------------------
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
         #左端---------------------
         # 左貝7.29
@@ -155,7 +158,7 @@ function calcStep1!(F_k_before, F_k_after, k, matN,Nref)
         
         A[N.y,N.y] += ηR/(steps.y)^2
 
-        #########################
+        #########################------------------------------------------------------
 
         
         # 透明境界条件(TBC) for B#######
@@ -166,16 +169,17 @@ function calcStep1!(F_k_before, F_k_after, k, matN,Nref)
         #@show F_k_before
 
         for j in 1:N.y
-            if matN[i,j,k] != 1.5
-                @show i,j,k,matN[i,j,k]
-            end
+#            if matN[i,j,k] != 1.5
+#                @show i,j,k,matN[i,j,k]
+#            end
+
             if i == 1
                 B[j] = -conj(colBL)*F_k_before[1,j] - colC*F_k_before[2,j]
             elseif i == N.x
                 B[j] = -conj(colBR)*F_k_before[N.x,j] - colC*F_k_before[N.x-1,j]
             else
                 #B[j] = c*F_k_before[i,j] + d(i,j,k)*F_k_before[i-1,j] + d(i,j,k)* F_k_before[i+1,j]
-                B[j] = a*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + c*F_k_before[i,j]
+                B[j] = ax*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + cx*F_k_before[i,j]
             end
         end
 
@@ -196,14 +200,16 @@ function calcStep2!(F_k_before, F_k_after,k, matN,Nref)
     k0 = 2π / beam.wavelength
     # a,b,cは左辺用
     # 左貝(7.25a)
-    a = -1/(steps.x)^2
+    ax = -1/(steps.x)^2
     # 左貝(7.25b)
-    b(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z + 2/steps.x^2 - k0^2(matN[i, j, k]^2 - Nref^2)
+    b(i,j,k) = 1im*4*k0*Nref/steps.z + 2/steps.x^2 - k0^2(matN[i, j, k]^2 - Nref^2)
     # 左貝(7.25a)
-    c = -1/(steps.x)^2
+    cx = -1/(steps.x)^2
     
     # d は 右辺用
-    d(i,j,k) = 1im*4*k0*matN[i, j, k]/steps.z - 2/steps.y^2 + k0^2(matN[i, j, k]^2 - Nref^2)
+    ay = -1/(steps.y)^2
+    d(i,j,k) = 1im*4*k0*Nref/steps.z - 2/steps.y^2 + k0^2(matN[i, j, k]^2 - Nref^2)
+    cy = -1/(steps.y)^2
     B = zeros(ComplexF64,N.x,1)
 
     for j in 1:N.y
@@ -213,8 +219,8 @@ function calcStep2!(F_k_before, F_k_after,k, matN,Nref)
         # diagmは配列を正方行列の対角に配置する。
         # pair（=>) でズレを表現できる。
         A = diagm(map(i -> b(i,j,k),1:N.x))
-        A += diagm(1 => fill(c,N.x-1))
-        A += diagm(-1 => fill(a,N.x-1))
+        A += diagm(1 => fill(cx,N.x-1))
+        A += diagm(-1 => fill(ax,N.x-1))
 
         #透明境界条件(TBC) for A#######
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
@@ -272,7 +278,7 @@ function calcStep2!(F_k_before, F_k_after,k, matN,Nref)
                 B[i] = -conj(colBR)*F_k_before[i,N.y] - colC*F_k_before[i,N.y-1]
             else
                 #B[i] = c*F_k_before[i, j] + d(i, j, k)*F_k_before[i,j-1] + d(i,j,k)* F_k_before[i,j+1]
-                B[i] = a*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + c*F_k_before[i,j]
+                B[i] = ay*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + cy*F_k_before[i,j]
             end
         end
 
@@ -338,13 +344,13 @@ function main()
     #左辺は更新されたF_k_1stが入る。
     # S
     #初期条件を F_K_1st に入れる。
-    Nref = 1.5
+    Nref = 1.45
 
     for t in 1:N.t
         @show "Zmax:", N.z
         for k in 1:N.z
             # x 固定、　y方向移動
-            @show t,k
+#            @show t,k
             calcStep1!(F_k_1st, F_k_2nd, k, matN,Nref)
             # y 固定、　x方向移動
             calcStep2!(F_k_2nd, F_k_1st, k, matN,Nref)
