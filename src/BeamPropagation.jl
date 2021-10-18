@@ -111,7 +111,6 @@ function calcStep1!(F_k_1st, F_k_half, k, matN,Nref)
     # よって、最初のループは固定方向のx(i)で、
     # 内部で、diagmで行列方向のN.y x N.y = jxjを作る。
     for i in 1:N.x
-
         # Ax=BのA (z = k+1 における係数行列)を作る。
         # mapでベクトルを作っておいて、diagmで対角行列にする。
         # bが位置によって値が異なるのでmapで対応。
@@ -127,9 +126,9 @@ function calcStep1!(F_k_1st, F_k_half, k, matN,Nref)
         # 藪107p
         KxL = -1 / (1im*steps.y) * log(F_k_1st[i,1]/F_k_1st[i,2])
         if real(KxL)<0
-            #reKxL = -1*reKxL      #左貝方式
-            KxL = imag(KxL)           #藪方式
+            KxL = imag(KxL)
         end
+
         ηL = exp(1im*KxL*(-step.y))
         A[1,1] += ηL*ax
 
@@ -189,14 +188,11 @@ function calcStep2!(F_k_half, f_k_2nd,k, matN,Nref)
     #今のところはk+1を抜き出す   
     k0 = 2π / beam.wavelength
     # a,b,cは左辺用
-    # 左貝(7.25a)
     ax = -1/(steps.x)^2
-    # 左貝(7.25b)
     b(i,j,k) = 1im*4*k0*Nref/steps.z + 2/steps.x^2 - k0^2(matN[i, j, k]^2 - Nref^2)
-    # 左貝(7.25a)
     cx = -1/(steps.x)^2
     
-    # d は 右辺用
+    #Bをつくる。 d は 右辺用 F_k_2ndの係数
     ay = -1/(steps.y)^2
     d(i,j,k) = 1im*4*k0*Nref/steps.z - 2/steps.y^2 + k0^2(matN[i, j, k]^2 - Nref^2)
     cy = -1/(steps.y)^2
@@ -219,21 +215,13 @@ function calcStep2!(F_k_half, f_k_2nd,k, matN,Nref)
         #imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
         #reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
 
-        kxl = -1/(1im * step.y) *
-
-        # reKxLおよびreKxRが負の時、
-        # 左貝だと符号逆転させて、藪だと0にすると書いてある。前者のほうがそれっぽい気がする。
-        if real(reKxL)<0
-            reKxL = -1*reKxL      #左貝方式
-            #reKxL = 0           #藪方式
+        kxl = -1/(1im * step.y) * log(F_k_half[1,j]/F_k_half[2,j])
+        if real(KxL)<0
+            KxL = imag(reKxL)
         end
 
-        #(左貝7.28)
-        #ηL = exp(1im* reKxL * steps.x - imKxL*steps.x)
-        ηL = exp(1im* (reKxL+ 1im*imKxL) *steps.x)
-        #ηL = 1/exp(1im* reKxL * steps.x - imKxL*steps.x)
-        ###!!! 左貝(7.25b)と(7,37a)比較して 差分をとる。
-        A[1,1] += ηL/(steps.x)^2
+        ηL = exp(1im*KxL*(-steps.x))
+        A[1,1] += ηL/ax
 
         #右端---------------------
         # 左貝(7.35)
@@ -243,15 +231,14 @@ function calcStep2!(F_k_half, f_k_2nd,k, matN,Nref)
 
         # 進行波なら、F_k_before[N.x-1, j] > F_k_before[N.x, j]となるべき。
         # つまり
-        if real(reKxR)>0
-            reKxR = -reKxR      #左貝方式
-            # reKxR = 0           #藪方式
+        if real(KxR)>0
+            KxR = imag(KxR)      #左貝方式
         end
 
         #ηR = exp(1im* reKxR * steps.y - imKxR*steps.x)
         #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
         
-        ηR = exp(1im* (reKxR + 1im*imKxR) * steps.y)
+        ηR = exp(1im* kxR * steps.y)
         A[N.x, N.x] += ηR/(steps.x)^2
 
         #########################
