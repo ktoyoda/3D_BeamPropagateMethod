@@ -147,8 +147,8 @@ function calcStep1!(F_k_before, f_k_half, k, matN, Nref)
         #ηR = exp(1im* reKxR * steps.y - imKxR*steps.x)
         #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
         
-        ηR = exp(1im* kxR * steps.y)
-        A[N.x, N.x] += ηR/(steps.x)^2
+        ηR = exp( 1im* kxR * steps.x)
+        A[N.x, N.x] += ηR*cx
 
         #########################
 
@@ -156,7 +156,7 @@ function calcStep1!(F_k_before, f_k_half, k, matN, Nref)
         # 透明境界条件(TBC) for B#######
         colBL = (2-ηL)/steps.x^2 - (matN[1, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
         colBR = (2-ηR)/steps.x^2 - (matN[N.x, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-        colC = -1/(steps.x)^2
+        colC = -1/(steps.y)^2
 
         #@show F_k_before
 
