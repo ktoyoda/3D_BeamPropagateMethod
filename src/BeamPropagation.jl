@@ -91,6 +91,94 @@ end
 # テキスト中nr と nについて
 # 
 
+#ADIの未知数X方向 定数Y方向 差分
+function calcStep1!(F_k_before, f_k_half, k, matN, Nref)
+    #正確には、k+1とKの屈折率の平均を取るべきだと思うが、
+    #今のところはk+1を抜き出す   
+    k0 = 2π / beam.wavelength
+    # a,b,cは左辺用
+    ax = -1/(steps.x)^2
+    b(i,j,k) = 1im*4*k0*Nref/steps.z + 2/steps.x^2 - k0^2(matN[i, j, k]^2 - Nref^2)
+    cx = -1/(steps.x)^2
+    
+    #Bをつくる。 d は 右辺用 F_k_2ndの係数
+    ay = -1/(steps.y)^2
+    d(i,j,k) = 1im*4*k0*Nref/steps.z - 2/steps.y^2 + k0^2(matN[i, j, k]^2 - Nref^2)
+    cy = -1/(steps.y)^2
+    B = zeros(ComplexF64,N.x,1)
+
+    for j in 1:N.y
+        # Ax=BのA (z = k+1 における係数行列)を作る。
+        # mapでベクトルを作っておいて、diagmで対角行列にする。
+        # bが位置によって値が異なるのでmapで対応。
+        # diagmは配列を正方行列の対角に配置する。
+        # pair（=>) でズレを表現できる。
+        A = diagm(map(i -> b(i,j,k),1:N.x))
+        A += diagm(1 => fill(cx,N.x-1))
+        A += diagm(-1 => fill(ax,N.x-1))
+
+        #透明境界条件(TBC) for A#######
+        # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
+        #左端---------------------
+        #左貝(7.29)
+        #imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
+        #reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
+
+        kxl = -1/(1im * step.y) * log(F_k_before[1,j]/F_k_before[2,j])
+        if real(KxL)<0
+            KxL = imag(reKxL)
+        end
+
+        ηL = exp(1im*KxL*(-steps.x))
+        A[1,1] += ηL/ax
+
+        #右端---------------------
+        # 左貝(7.35)
+        #imKxR = (1/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
+        #reKxR = (1im/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j]*exp(-imKxR*steps.y))
+        KxR = -1 / (1im*steps.x) * log(F_k_before[N.x , j]/F_k_before[N.x-1, j])
+
+        # 進行波なら、F_k_before[N.x-1, j] > F_k_before[N.x, j]となるべき。
+        # つまり
+        if real(KxR)>0
+            KxR = imag(KxR)      #左貝方式
+        end
+
+        #ηR = exp(1im* reKxR * steps.y - imKxR*steps.x)
+        #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
+        
+        ηR = exp(1im* kxR * steps.y)
+        A[N.x, N.x] += ηR/(steps.x)^2
+
+        #########################
+
+        
+        # 透明境界条件(TBC) for B#######
+        colBL = (2-ηL)/steps.x^2 - (matN[1, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+        colBR = (2-ηR)/steps.x^2 - (matN[N.x, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+        colC = -1/(steps.x)^2
+
+        #@show F_k_before
+
+        for i in 1:N.x
+            if j == 1
+                B[i] = -conj(colBL)*F_k_before[i,1] - colC*F_k_before[i,2]
+            elseif j == N.y
+                B[i] = -conj(colBR)*F_k_before[i,N.y] - colC*F_k_before[i,N.y-1]
+            else
+                #B[i] = c*F_k_before[i, j] + d(i, j, k)*F_k_before[i,j-1] + d(i,j,k)* F_k_before[i,j+1]
+                B[i] = ay*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + cy*F_k_before[i,j]
+            end
+        end
+
+        #########################
+
+        f_k_half[:,j] = B\A
+        #F_k_after[]を使って、新しい屈折率マップを作る。
+
+    end
+end
+
 function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
 
     k0 = 2π / beam.wavelength
@@ -158,10 +246,6 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
         #@show F_k_before
 
         for j in 1:N.y
-#            if matN[i,j,k] != 1.5
-#                @show i,j,k,matN[i,j,k]
-#            end
-
             if i == 1
                 B[j] = -conj(colBL)*F_k_half[1,j] - colC*F_k_half[2,j]
             elseif i == N.x
@@ -181,95 +265,6 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
     end
     return F_k_next
 end
-
-#ADIの未知数X方向 定数Y方向 差分
-function calcStep1!(F_k_before, f_k_half, k, matN, Nref)
-    #正確には、k+1とKの屈折率の平均を取るべきだと思うが、
-    #今のところはk+1を抜き出す   
-    k0 = 2π / beam.wavelength
-    # a,b,cは左辺用
-    ax = -1/(steps.x)^2
-    b(i,j,k) = 1im*4*k0*Nref/steps.z + 2/steps.x^2 - k0^2(matN[i, j, k]^2 - Nref^2)
-    cx = -1/(steps.x)^2
-    
-    #Bをつくる。 d は 右辺用 F_k_2ndの係数
-    ay = -1/(steps.y)^2
-    d(i,j,k) = 1im*4*k0*Nref/steps.z - 2/steps.y^2 + k0^2(matN[i, j, k]^2 - Nref^2)
-    cy = -1/(steps.y)^2
-    B = zeros(ComplexF64,N.x,1)
-
-    for j in 1:N.y
-        # Ax=BのA (z = k+1 における係数行列)を作る。
-        # mapでベクトルを作っておいて、diagmで対角行列にする。
-        # bが位置によって値が異なるのでmapで対応。
-        # diagmは配列を正方行列の対角に配置する。
-        # pair（=>) でズレを表現できる。
-        A = diagm(map(i -> b(i,j,k),1:N.x))
-        A += diagm(1 => fill(cx,N.x-1))
-        A += diagm(-1 => fill(ax,N.x-1))
-
-        #透明境界条件(TBC) for A#######
-        # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
-        #左端---------------------
-        #左貝(7.29)
-        #imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
-        #reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
-
-        kxl = -1/(1im * step.y) * log(F_k_before[1,j]/F_k_before[2,j])
-        if real(KxL)<0
-            KxL = imag(reKxL)
-        end
-
-        ηL = exp(1im*KxL*(-steps.x))
-        A[1,1] += ηL/ax
-
-        #右端---------------------
-        # 左貝(7.35)
-        #imKxR = (1/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
-        #reKxR = (1im/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j]*exp(-imKxR*steps.y))
-
-
-        # 進行波なら、F_k_before[N.x-1, j] > F_k_before[N.x, j]となるべき。
-        # つまり
-        if real(KxR)>0
-            KxR = imag(KxR)      #左貝方式
-        end
-
-        #ηR = exp(1im* reKxR * steps.y - imKxR*steps.x)
-        #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
-        
-        ηR = exp(1im* kxR * steps.y)
-        A[N.x, N.x] += ηR/(steps.x)^2
-
-        #########################
-
-        
-        # 透明境界条件(TBC) for B#######
-        colBL = (2-ηL)/steps.x^2 - (matN[1, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-        colBR = (2-ηR)/steps.x^2 - (matN[N.x, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-        colC = -1/(steps.x)^2
-
-        #@show F_k_before
-
-        for i in 1:N.x
-            if j == 1
-                B[i] = -conj(colBL)*F_k_before[i,1] - colC*F_k_before[i,2]
-            elseif j == N.y
-                B[i] = -conj(colBR)*F_k_before[i,N.y] - colC*F_k_before[i,N.y-1]
-            else
-                #B[i] = c*F_k_before[i, j] + d(i, j, k)*F_k_before[i,j-1] + d(i,j,k)* F_k_before[i,j+1]
-                B[i] = ay*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + cy*F_k_before[i,j]
-            end
-        end
-
-        #########################
-
-        f_k_half[:,j] = B\A
-        #F_k_after[]を使って、新しい屈折率マップを作る。
-
-    end
-end
-
 
 function retN()
     return 1
