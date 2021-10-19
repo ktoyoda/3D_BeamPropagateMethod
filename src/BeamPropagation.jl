@@ -91,7 +91,7 @@ end
 # テキスト中nr と nについて
 # 
 
-function calcStep1!(F_k_1st, F_k_half, k, matN,Nref)
+function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
 
     k0 = 2π / beam.wavelength
     # Aをつくる。 a,b,cは左辺用
@@ -124,7 +124,7 @@ function calcStep1!(F_k_1st, F_k_half, k, matN,Nref)
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
         #左端---------------------
         # 藪107p
-        KxL = -1 / (1im*steps.y) * log(F_k_1st[i,1]/F_k_1st[i,2])
+        KxL = -1 / (1im*steps.y) * log(F_k_half[i,1]/F_k_half[i,2])
         if real(KxL)<0
             KxL = imag(KxL)
         end
@@ -134,7 +134,7 @@ function calcStep1!(F_k_1st, F_k_half, k, matN,Nref)
 
         #右端---------------------
         #左貝7.35
-        KxR = -1 / (1im*steps.y) * log(F_k_1st[i,N.y]/F_k_1st[i,N.y-1])
+        KxR = -1 / (1im*steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
         
         if real(KxR)<0
             #reKxR = -reKxR      #左貝方式
@@ -163,27 +163,27 @@ function calcStep1!(F_k_1st, F_k_half, k, matN,Nref)
 #            end
 
             if i == 1
-                B[j] = -conj(colBL)*F_k_1st[1,j] - colC*F_k_1st[2,j]
+                B[j] = -conj(colBL)*F_k_half[1,j] - colC*F_k_half[2,j]
             elseif i == N.x
-                B[j] = -conj(colBR)*F_k_1st[N.x,j] - colC*F_k_1st[N.x-1,j]
+                B[j] = -conj(colBR)*F_k_half[N.x,j] - colC*F_k_half[N.x-1,j]
             else
                 #B[j] = c*F_k_before[i,j] + d(i,j,k)*F_k_before[i-1,j] + d(i,j,k)* F_k_before[i+1,j]
-                B[j] = ax*F_k_1st[i,j] + b(i,j,k) *F_k_1st[i,j] + cx*F_k_1st[i,j]
+                B[j] = ax*F_k_half[i,j] + b(i,j,k) *F_k_half[i,j] + cx*F_k_half[i,j]
             end
         end
 
         
         #########################
 
-        F_k_half[i,:] = B\A
+        F_k_next[i,:] = B\A
         #F_k_after[]を使って、新しい屈折率マップを作る。
 
     end
-    return F_k_half
+    return F_k_next
 end
 
 #ADIの未知数X方向 定数Y方向 差分
-function calcStep2!(F_k_half, f_k_2nd,k, matN,Nref)
+function calcStep1!(F_k_before, f_k_half, k, matN, Nref)
     #正確には、k+1とKの屈折率の平均を取るべきだと思うが、
     #今のところはk+1を抜き出す   
     k0 = 2π / beam.wavelength
@@ -215,7 +215,7 @@ function calcStep2!(F_k_half, f_k_2nd,k, matN,Nref)
         #imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
         #reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
 
-        kxl = -1/(1im * step.y) * log(F_k_half[1,j]/F_k_half[2,j])
+        kxl = -1/(1im * step.y) * log(F_k_before[1,j]/F_k_before[2,j])
         if real(KxL)<0
             KxL = imag(reKxL)
         end
@@ -253,18 +253,18 @@ function calcStep2!(F_k_half, f_k_2nd,k, matN,Nref)
 
         for i in 1:N.x
             if j == 1
-                B[i] = -conj(colBL)*F_k_half[i,1] - colC*F_k_half[i,2]
+                B[i] = -conj(colBL)*F_k_before[i,1] - colC*F_k_before[i,2]
             elseif j == N.y
-                B[i] = -conj(colBR)*F_k_half[i,N.y] - colC*F_k_half[i,N.y-1]
+                B[i] = -conj(colBR)*F_k_before[i,N.y] - colC*F_k_before[i,N.y-1]
             else
                 #B[i] = c*F_k_before[i, j] + d(i, j, k)*F_k_before[i,j-1] + d(i,j,k)* F_k_before[i,j+1]
-                B[i] = ay*F_k_half[i,j] + b(i,j,k) *F_k_half[i,j] + cy*F_k_half[i,j]
+                B[i] = ay*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + cy*F_k_before[i,j]
             end
         end
 
         #########################
 
-        f_k_2nd[:,j] = B\A
+        f_k_half[:,j] = B\A
         #F_k_after[]を使って、新しい屈折率マップを作る。
 
     end
@@ -329,11 +329,11 @@ function main()
     for t in 1:N.t
         @show "Zmax:", N.z
         for k in 1:N.z
-            # x 固定、　y方向移動
+            
 #            @show t,k
-
-            calcStep1!(F_k_1st, F_k_half, k, matN, Nref)
             # y 固定、　x方向移動
+            calcStep1!(F_k_1st, F_k_half, k, matN, Nref)
+            # x 固定、　y方向移動
             calcStep2!(F_k_half, F_k_2nd, k, matN, Nref)
             F_k_1st = F_k_2nd
             F_result[:,:,k] = F_k_2nd
