@@ -92,7 +92,7 @@ end
 # 
 
 #ADIの未知数X方向 定数Y方向 差分
-function calcStep1!(F_k_before, f_k_half, k, matN, Nref)
+function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
     #正確には、k+1とKの屈折率の平均を取るべきだと思うが、
     #今のところはk+1を抜き出す   
     k0 = 2π / beam.wavelength
@@ -124,9 +124,9 @@ function calcStep1!(F_k_before, f_k_half, k, matN, Nref)
         #imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
         #reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
 
-        kxl = -1/(1im * step.y) * log(F_k_before[1,j]/F_k_before[2,j])
+        KxL = -1/(1im * steps.y) * log(F_k_before[1,j]/F_k_before[2,j])
         if real(KxL)<0
-            KxL = imag(reKxL)
+            KxL = imag(KxL)
         end
 
         ηL = exp(1im*KxL*(-steps.x))
@@ -147,24 +147,29 @@ function calcStep1!(F_k_before, f_k_half, k, matN, Nref)
         #ηR = exp(1im* reKxR * steps.y - imKxR*steps.x)
         #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
         
-        ηR = exp( 1im* kxR * steps.x)
+        ηR = exp( 1im* KxR * steps.x)
         A[N.x, N.x] += ηR*cx
 
         #########################
 
         
-        # 透明境界条件(TBC) for B#######
-        colBL = (2-ηL)/steps.x^2 - (matN[1, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-        colBR = (2-ηR)/steps.x^2 - (matN[N.x, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-        colC = -1/(steps.y)^2
+         # 透明境界条件(TBC) for B#######
+         colBL = (2-ηL)/steps.x^2 - (matN[1, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+         colBR = (2-ηR)/steps.x^2 - (matN[N.x, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+         colC = -1/(steps.y)^2
 
         #@show F_k_before
 
         for i in 1:N.x
             if j == 1
-                B[i] = -conj(colBL)*F_k_before[i,1] - colC*F_k_before[i,2]
+                KxL = -1 / (1im*steps.y) * log(F_k_before[i,1]/F_k_before[i,2])
+                if real(KxL) < 0
+                    KxL = imag(KxL)
+                end
+                ηL = exp(1im*KxL*(-steps.y))
+                B[i] = F_k_before[i,1] - colC * F_k_before[i,2] + ηL*ax
             elseif j == N.y
-                B[i] = -conj(colBR)*F_k_before[i,N.y] - colC*F_k_before[i,N.y-1]
+                B[i] = -conj(colBR)*F_k_before[i,N.y] - colC * F_k_before[i,N.y-1]
             else
                 #B[i] = c*F_k_before[i, j] + d(i, j, k)*F_k_before[i,j-1] + d(i,j,k)* F_k_before[i,j+1]
                 B[i] = ay*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + cy*F_k_before[i,j]
@@ -173,7 +178,7 @@ function calcStep1!(F_k_before, f_k_half, k, matN, Nref)
 
         #########################
 
-        f_k_half[:,j] = B\A
+        F_k_half[:,j] = B\A
         #F_k_after[]を使って、新しい屈折率マップを作る。
 
     end
@@ -217,7 +222,7 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
             KxL = imag(KxL)
         end
 
-        ηL = exp(1im*KxL*(-step.y))
+        ηL = exp(1im*KxL*(-steps.y))
         A[1,1] += ηL*ax
 
         #右端---------------------
@@ -307,6 +312,7 @@ function main()
     #F_k_2ndは更新されたF_k
     @show N.x * N.y, N.x* N.y
     F_k_1st = zeros(ComplexF64, N.x, N.y) #Zerosに型指定忘れないこと！！！
+    F_k_half = zeros(ComplexF64, N.x, N.y)
     F_k_2nd = zeros(ComplexF64, N.x, N.y)
     matN = zeros(ComplexF64,(N.x,N.y,N.z))
     @show size(F0)
