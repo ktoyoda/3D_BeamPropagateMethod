@@ -5,7 +5,7 @@ function setNfocus(N::Array{ComplexF64,2},NA,n,separatingpoint,)
     
 end
 
-function setNwaveguide!(N::Array{ComplexF64,3},xstep, ystep, zstep, diameter, angle,baseN , propN, starting_separate)
+function setNwaveguide!(N::Array{Float64,3},xstep, ystep, zstep, diameter, angle,baseN , propN, starting_separate)
     Nx = size(N,1)
     Ny = size(N,2)
     Nz = size(N,3)

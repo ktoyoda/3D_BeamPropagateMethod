@@ -27,11 +27,11 @@ Nt = Int(floor(crange.t / steps.t))
 N = Params.N(Nx,Ny,Nz,Nt)
 
 #材料情報
-material = Params.materiarl(nb = 1.504, Δn0 = -0.004, τ = 0.1,α = 0)
+material = Params.materiarl(nb = 1.54, Δn0 = -0.2, τ = 0.1,α = 0)
 mode = Params.gauss_mode(0,0)
 
 #ビーム情報
-beam = Params.beam(w = 2um, U0 = 0.001, wavelength = 1.064um)
+beam = Params.beam(w = 5um, U0 = 1, wavelength = 1.064um)
 
 println("計算環境")
 #versioninfo()
@@ -98,16 +98,17 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
     k0 = 2π / beam.wavelength
     # a,b,cは左辺用
     ax = -1/(steps.x)^2
-    b(i,j,k) = 1im*4*k0*Nref/steps.z + 2/steps.x^2 - k0^2(matN[i, j, k]^2 - Nref^2)
+    b(i,j,k) = 1im*4k0*Nref/steps.z + 2/steps.x^2 - k0^2(matN[i, j, k]^2 - Nref^2)/2
     cx = -1/(steps.x)^2
     
     #Bをつくる。 d は 右辺用 F_k_2ndの係数
-    ay = -1/(steps.y)^2
-    d(i,j,k) = 1im*4*k0*Nref/steps.z - 2/steps.y^2 + k0^2(matN[i, j, k]^2 - Nref^2)
-    cy = -1/(steps.y)^2
+    ay = +1/(steps.y)^2
+    d(i,j,k) = 1im*4*k0*Nref/steps.z - 2/steps.y^2 + k0^2(matN[i, j, k]^2 - Nref^2)/2
+    cy = +1/(steps.y)^2
     B = zeros(ComplexF64,N.x,1)
 
     for j in 1:N.y
+        #! jに関して透明境界条件必要じゃないんか？いらないか
         # Ax=BのA (z = k+1 における係数行列)を作る。
         # mapでベクトルを作っておいて、diagmで対角行列にする。
         # bが位置によって値が異なるのでmapで対応。
@@ -126,6 +127,7 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
 
         KxL = -1/(1im * steps.y) * log(F_k_before[1,j]/F_k_before[2,j])
         if real(KxL)<0
+
             KxL = imag(KxL)
         end
 
@@ -189,13 +191,13 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
     k0 = 2π / beam.wavelength
     # Aをつくる。 a,b,cは左辺用
     ay = -1/(steps.y)^2
-    b(i,j,k) = 1im*4*k0*Nref/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]^2 - Nref^2)
+    b(i,j,k) = 1im*4*k0*Nref/steps.z + 2/steps.y^2 - k0^2(matN[i, j, k]^2 - Nref^2)/2
     cy = -1/(steps.y)^2
     
     # Bをつくる。 d は 右辺用。 F_k_halfの係数
-    ax = -1/(steps.x)^2
-    d(i,j,k) = 1im*4*k0*Nref/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]^2 - Nref^2)
-    cx = -1/(steps.x)^2
+    ax = 1/(steps.x)^2
+    d(i,j,k) = 1im*4*k0*Nref/steps.z - 2/steps.x^2 + k0^2(matN[i, j, k]^2 - Nref^2)/2
+    cx = 1/(steps.x)^2
     B = zeros(ComplexF64,N.y,1)
     # yをつくる。
 
@@ -314,23 +316,28 @@ function main()
     F_k_1st = zeros(ComplexF64, N.x, N.y) #Zerosに型指定忘れないこと！！！
     F_k_half = zeros(ComplexF64, N.x, N.y)
     F_k_2nd = zeros(ComplexF64, N.x, N.y)
-    matN = zeros(ComplexF64,(N.x,N.y,N.z))
+    matN = zeros(Float64,(N.x,N.y,N.z))
     @show size(F0)
     @show size(E)
-    @show size(F_k_1st[:,:,1])
-    F_k_1st[:,:,1] = E
+    @show typeof(E)
+    @show size(F_k_1st)
+    F_k_1st = E
+    p = contour(real.(E),levels = 200)
+    display((p))
     setNwaveguide!(matN, steps.x, steps.y, steps.z, 5um, 0, material.nb, material.nb + material.Δn0, 0.5)
     #@show matN
-    
+    p = contourf(matN[:,Int(floor(N.y)/2),:])
+    display((p))
+    #@show matN
     #左辺は更新されたF_k_1stが入る。
     # S
     #初期条件を F_K_1st に入れる。
-    Nref = 1.45
+    Nref = (material.nb + (material.nb + material.Δn0)) /2
 
     for t in 1:N.t
         @show "Zmax:", N.z
         for k in 1:N.z
-            
+            @show "zsteps is ",k
 #            @show t,k
             # y 固定、　x方向移動
             calcStep1!(F_k_1st, F_k_half, k, matN, Nref)
@@ -347,7 +354,7 @@ function main()
     Ezx = abs.(F_result[Int(floor(N.y/2)),: , :])
 #  @show Ezx
     @show typeof(Ezx)
-    p1 = contourf(Ezx,levels = 200,clim = (0,maximum(Ezx)/10))
+    p1 = contourf(Ezx,levels = 200,clim = (0,maximum(Ezx)/10),lim=(0.25,0))
     @show maximum(abs.(F_result[:, :, :]))
     @show maximum(Ezx)
     display(p1)
