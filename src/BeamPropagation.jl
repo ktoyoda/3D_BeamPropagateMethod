@@ -19,7 +19,7 @@ um = Params.um
 #計算レンジ
 crange = Params.crange(x = 20um, y = 20um, z = 100um, t = 0.1)
 #計算ステップ
-steps = Params.steps(x = 0.1um, y = 0.1um, z = 1um, t = 0.1)
+steps = Params.steps(x = 0.2um, y = 0.2um, z = 1um, t = 0.1)
 Nx = Int(floor(crange.x / steps.x))
 Ny = Int(floor(crange.y / steps.y))
 Nz = Int(floor(crange.z / steps.z))
@@ -123,12 +123,16 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
         #左端 ηLを作成する。---------------------
         #左貝(7.29)
+        #=
         imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
         reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
-
         KxL = reKxL + imKxL
-        if real(KxL) > 0
-            KxL = -reKxL + imKxL
+        =#
+        KxL = -(1/(1im*steps.x))   * log(F_k_before[1,j]/F_k_before[2,j])
+
+        if real(KxL) < 0
+            #KxL = -reKxL + imKxL
+            KxL = -real(KxL) + 1im*imag(KxL)
         end
 
         ηL = exp(1im*KxL*(-steps.x))
@@ -136,12 +140,14 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
 
         #右端 ηRを作成する。---------------------
         # 左貝(7.35)
+        #=
         imKxR = (1/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
         reKxR = (1im/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j]*exp(-imKxR*steps.y))
         KxR = reKxR + 1im* imKxR
-
-        if real(KxR) < 0
-            KxR = -reKxR + 1im* imKxR      #左貝方式
+        =#
+        KxR = (-1/(1im*steps.x)) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
+        if real(KxR) > 0
+            KxR = -real(KxR) + 1im* imag(KxR)      #左貝方式
         end
 
         ηR = exp( 1im* KxR * steps.x)
@@ -158,9 +164,13 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
 
         for i in 1:N.x
             if j == 1
-                B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j+1] #+ ηU？
+                K_temp = (-1/(1im*steps.y))   * log(F_k_before[i,1] / F_k_before[i,2])
+                F0 = F_k_before[i,1] * exp(1im * K_temp*(-steps.y))
+                B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j+1] +d_ac*F0 #+ ηU？
             elseif j == Ny
-                B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j-1] #+ ηB？
+                K_temp = (-1/(1im*steps.y))   * log(F_k_before[i,Ny] / F_k_before[i,Ny-1])
+                F0 = F_k_before[i,Ny] * exp(1im * K_temp*(-steps.y))
+                B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j-1] +d_ac * F0#+ ηB？
             else
                 B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j-1] + d_ac*F_k_before[i,j+1]    
             end
@@ -168,7 +178,6 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
         #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         #########################
-        #ばかすぎる。バックスラッシュぎゃくやんけ。。。
         F_k_half[:,j] = A \ B
         #F_k_after[]を使って、新しい屈折率マップを作る。
 
@@ -221,14 +230,15 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
         #上端---------------------
         #左貝(7.29)
+        #=
         imKyU = -(1/steps.y)   * log(F_k_half[i,2]/F_k_half[i,1])
         reKyU = -(1im/steps.y) * log(F_k_half[i,2]/F_k_half[i,1]*exp(imKyU*steps.y))
-        #KxU = -1/(1im * steps.y) * log(F_k_before[1,j]/F_k_before[2,j])
         KyU = reKyU + 1im* imKyU
-
-        if real(KyU) > 0
-            KyU = -reKyU + 1im * imKyU
-        #   KyU = -real(Ky)
+        =#
+        KyU = -(1/(1im*steps.y))   * log(F_k_half[i,1]/F_k_half[i,2])
+        if real(KyU) < 0
+        #    KyU = -reKyU + 1im * imKyU
+           KyU = -real(KyU) +1im * imag(KyU)
         end
 
         ηU = exp(1im * KyU * (-steps.y))
@@ -238,14 +248,16 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
 
         #下端---------------------
         #左貝7.35
-        #KyB = -1 / (1im*steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
-        imKyB = (1/steps.y)   * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
-        reKyB = (1im/steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1]*exp(imKyB*steps.y))
+        #=
+        imKyB = (1/steps.y)   * log(F_k_half[i,N.y] / F_k_half[i,N.y-1])
+        reKyB = (1im/steps.y) * log(F_k_half[i,N.y] / F_k_half[i,N.y-1]*exp(imKyB*steps.y))
         KyB = reKyB + 1im* imKyB
+        =#
+        KyB = (-1/(1im*steps.y))   * log(F_k_half[i,N.y] / F_k_half[i,N.y-1])
 
-        if real(KyB) < 0
+        if real(KyB) > 0
             #reKxR = -reKxR      #左貝方式
-            KyB = -reKyB + 1im* imKyB           #藪方式
+            KyB = -real(KyB) + 1im* imag(KyB)           #藪方式
             #KyB = - real(KyB) + 1im* imag(KyB)
         end
         
@@ -265,9 +277,14 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
 
         for j in 1:N.y
             if i == 1
-                B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i+1,j] #+ ηU？
+                K_temp = (-1/(1im*steps.x))   * log(F_k_half[1,j] / F_k_half[2,j])
+                F0 = F_k_half[1,j] * exp(1im * K_temp*(-steps.x))
+                B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i+1,j] + d_ac*F0
+                
             elseif i == N.x
-                B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i-1,j] #+ ηB？
+                K_temp = (-1/(1im*steps.x))   * log(F_k_half[Nx,j] / F_k_half[Nx-1,j])
+                F0 = F_k_half[Nx,j] * exp(1im * K_temp*(-steps.x))
+                B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i-1,j] + d_ac*F0 
             else
                 B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i-1,j] + d_ac*F_k_half[i+1,j]    
             end
@@ -330,12 +347,12 @@ function main()
     @show typeof(E)
     @show size(F_k_1st)
     F_k_1st = E
-    p = contour(real.(E),levels = 200)
-    display((p))
+#    p = contour(real.(E),levels = 200)
+#    display((p))
     setNwaveguide!(matN, steps.x, steps.y, steps.z, 4um, 0, material.nb, material.nb + material.Δn0, 0.5)
     #@show matN
-    p = contourf(matN[:,Int(floor(N.y)/2),:])
-    display((p))
+#    p = contourf(matN[:,Int(floor(N.y)/2),:])
+#    display((p))
     #@show matN
     #左辺は更新されたF_k_1stが入る。
     # S
@@ -353,8 +370,6 @@ function main()
             calcStep2!(F_k_half, F_k_2nd, k, matN, Nref)
             F_k_1st = F_k_2nd
             F_result[:,:,k] = F_k_2nd
-            F_k_2nd = zeros(ComplexF64,Nx,Ny)
-            F_k_half = zeros(ComplexF64,Nx,Ny)
         end
     #    @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
     end
@@ -376,9 +391,12 @@ Ezx = abs.(F_result[Int(floor(N.y/2)-1),: , :])
 p1 = heatmap(Ezx,levels = 200)#,clim = (0,0))#,lim=(0.25,0))
 @show maximum(abs.(F_result[:, :, :]))
 @show maximum(Ezx)
-
 display(p1)
+
+Ezy = abs.(F_result[: , Int(floor(N.y/2)-1),:])
+p3 = heatmap(Ezy,levels = 200)#,clim = (0,0))#,lim=(0.25,0))
+@show size(F_result)
+display(p3)
+
 p2 = plot(Ezx[Int(floor(N.y/2)),:])
 display(p2)
-#    p2 = contourf()
-
