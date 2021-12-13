@@ -108,7 +108,8 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
     B = zeros(ComplexF64,N.x,1)
 
     for j in 1:N.y
-        #! jに関して透明境界条件必要じゃないんか？いらないか
+        #! jに関して透明境界条件必要じゃないんか？
+        #! 左貝146Pにφ₀ʳ≒φ₁ʳ*ηLで近似できると書いてあった。
         # Ax=BのA (z = k+1 における係数行列)を作る。
         # mapでベクトルを作っておいて、diagmで対角行列にする。
         # bが位置によって値が異なるのでmapで対応。
@@ -120,67 +121,56 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
 
         #透明境界条件(TBC) for A#######
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
-        #左端---------------------
+        #左端 ηLを作成する。---------------------
         #左貝(7.29)
-        #imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
-        #reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
-
-        KxL = -1/(1im * steps.y) * log(F_k_before[1,j]/F_k_before[2,j])
-        if real(KxL)<0
-
-            KxL = imag(KxL)
+        imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
+        reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
+        @show reKxL
+        @show imKxL
+        KxL = reKxL + imKxL
+        if real(KxL) < 0
+            KxL = -reKxL + imKxL
         end
 
         ηL = exp(1im*KxL*(-steps.x))
-        A[1,1] += ηL/ax
+        A[1,1] += ηL*ax
 
-        #右端---------------------
+        #右端 ηRを作成する。---------------------
         # 左貝(7.35)
-        #imKxR = (1/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
-        #reKxR = (1im/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j]*exp(-imKxR*steps.y))
-        KxR = -1 / (1im*steps.x) * log(F_k_before[N.x , j]/F_k_before[N.x-1, j])
+        imKxR = (1/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
+        reKxR = (1im/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j]*exp(-imKxR*steps.y))
+        KxR = reKxR + imKxR
 
-        # 進行波なら、F_k_before[N.x-1, j] > F_k_before[N.x, j]となるべき。
-        # つまり
-        if real(KxR)>0
-            KxR = imag(KxR)      #左貝方式
+        if real(KxR) > 0
+            KxR = -reKxR + imKxR      #左貝方式
         end
 
-        #ηR = exp(1im* reKxR * steps.y - imKxR*steps.x)
-        #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
-        
         ηR = exp( 1im* KxR * steps.x)
         A[N.x, N.x] += ηR*cx
 
         #########################
 
-        
-         # 透明境界条件(TBC) for B#######
-         colBL = (2-ηL)/steps.x^2 - (matN[1, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-         colBR = (2-ηR)/steps.x^2 - (matN[N.x, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-         colC = -1/(steps.y)^2
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         # 透明境界条件(TBC)を適用したBの係数#######
+         d_b(i,j,k) = - 2/steps.y^2 + (matN[i, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+         d_ac = 1/(steps.y)^2
 
         #@show F_k_before
 
         for i in 1:N.x
             if j == 1
-                KxL = -1 / (1im*steps.y) * log(F_k_before[i,1]/F_k_before[i,2])
-                if real(KxL) < 0
-                    KxL = imag(KxL)
-                end
-                ηL = exp(1im*KxL*(-steps.y))
-                B[i] = F_k_before[i,1] - colC * F_k_before[i,2] + ηL*ax
-            elseif j == N.y
-                B[i] = -conj(colBR)*F_k_before[i,N.y] - colC * F_k_before[i,N.y-1]
+                B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j+1] #+ ηU？
+            elseif j == Ny
+                B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j-1] #+ ηB？
             else
-                #B[i] = c*F_k_before[i, j] + d(i, j, k)*F_k_before[i,j-1] + d(i,j,k)* F_k_before[i,j+1]
-                B[i] = ay*F_k_before[i,j] + b(i,j,k) *F_k_before[i,j] + cy*F_k_before[i,j]
+                B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j-1] + d_ac*F_k_before[i,j+1]    
             end
         end
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         #########################
-
-        F_k_half[:,j] = B\A
+        #ばかすぎる。バックスラッシュぎゃくやんけ。。。
+        F_k_half[:,j] = A \ B
         #F_k_after[]を使って、新しい屈折率マップを作る。
 
     end
@@ -201,7 +191,6 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
     B = zeros(ComplexF64,N.y,1)
     # yをつくる。
 
-    Y = 
     # 各回 iを固定して、jxj　の行列を作って計算する。
     # よって、最初のループは固定方向のx(i)で、
     # 内部で、diagmで行列方向のN.y x N.y = jxjを作る。
@@ -219,6 +208,7 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
         #左端---------------------
         # 藪107p
+        #= ```
         KxL = -1 / (1im*steps.y) * log(F_k_half[i,1]/F_k_half[i,2])
         if real(KxL)<0
             KxL = imag(KxL)
@@ -226,28 +216,50 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
 
         ηL = exp(1im*KxL*(-steps.y))
         A[1,1] += ηL*ax
+        ```
+        =# 
+        #透明境界条件(TBC) for A#######
+        # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
+        #上端---------------------
+        #左貝(7.29)
+        imKyU = -(1/steps.y)   * log(F_k_half[i,2]/F_k_half[i,1])
+        reKyU = -(1im/steps.y) * log(F_k_half[i,2]/F_k_half[i,1]*exp(imKyU*steps.y))
+        #KxL = -1/(1im * steps.y) * log(F_k_before[1,j]/F_k_before[2,j])
+        KyU = reKyU + imKyU
+        # real つけなくてもいいはずだが、
+        # 
+        if real(KyU) > 0
+            KyU = -reKyU + imKyU
+        end
 
-        #右端---------------------
+        ηU = exp(1im * KyU * (-steps.y))
+        A[1,1] += ηU/ay
+        ##!!!!!
+
+
+        #下端---------------------
         #左貝7.35
-        KxR = -1 / (1im*steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
-        
-        if real(KxR)<0
+        #KyB = -1 / (1im*steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
+        imKyB = -(1/steps.y)   * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
+        reKyB = -(1im/steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1]*exp(imKyB*steps.y))
+        KyB = reKyB + imKyB
+        if real(KyB) < 0
             #reKxR = -reKxR      #左貝方式
-            KxR = imag(KxR)           #藪方式
+            KyB = -reKyB + imKyB           #藪方式
         end
         
-        #ηR = exp(1im* reKxR * steps.y - imKxR*steps.x)
-        ηR = exp(- 1im* KxR * steps.y)
+        ηB = exp(-1im* reKyB * steps.y)
+        #η = exp(- 1im* KxR * steps.y)
         #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
         
-        A[N.y,N.y] += ηR*cy
+        A[N.y,N.y] += ηB*cy
 
         #########################------------------------------------------------------
 
         
         # 透明境界条件(TBC) for B#######
-        colBL = (2-ηL)/steps.y^2 - (matN[i,1,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-        colBR = (2-ηR)/steps.y^2 - (matN[i,N.y,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+        colBL = (2-ηU)/steps.y^2 - (matN[i,1,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+        colBR = (2-ηB)/steps.y^2 - (matN[i,N.y,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
         colC = -1/(steps.x)^2
 
         #@show F_k_before
@@ -354,7 +366,7 @@ function main()
     Ezx = abs.(F_result[Int(floor(N.y/2)),: , :])
 #  @show Ezx
     @show typeof(Ezx)
-    p1 = contourf(Ezx,levels = 200,clim = (0,maximum(Ezx)/10),lim=(0.25,0))
+    p1 = contourf(Ezx,levels = 200,clim = (0,maximum(Ezx)/10))#,lim=(0.25,0))
     @show maximum(abs.(F_result[:, :, :]))
     @show maximum(Ezx)
     display(p1)
