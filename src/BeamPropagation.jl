@@ -31,7 +31,7 @@ material = Params.materiarl(nb = 1.5, Δn0 = 0.004, τ = 0.1,α = 0)
 mode = Params.gauss_mode(0,0)
 
 #ビーム情報
-beam = Params.beam(w = 2um, U0 = 1, wavelength = 1.064um)
+beam = Params.beam(w = 1.06um, U0 = 1, wavelength = 1.064um)
 
 println("計算環境")
 #versioninfo()
@@ -360,23 +360,25 @@ function main()
     end
     # @show F_result
     println("calc done")
-    println("plotting.....") 
-    Ezx = abs.(F_result[Int(floor(N.y/2)+1),: , :])
-#  @show Ezx
-    @show typeof(Ezx)
-    #z = range(-crange.Zmax,crange.Zmax,length = Nz)
-    #x = range(-crange.Xmax,crange.Xmax,length = Nz)
-    p1 = heatmap(Ezx,levels = 200)#,clim = (0,0))#,lim=(0.25,0))
-    @show maximum(abs.(F_result[:, :, :]))
-    @show maximum(Ezx)
-    display(p1)
-    p2 = plot(Ezx[Int(floor(N.y/2)),:])
-    display(p2)
-#    p2 = contourf()
-    #//////////////////////////////////////////////////////////////////////
-
+    
+    return F_result
+    #/////////////////////////////////////////////////////////////////////
 end
 
-@time main()
+@time F_result = main()
 
+println("plotting.....") 
+Ezx = abs.(F_result[Int(floor(N.y/2)-1),: , :])
+#  @show Ezx
+@show typeof(Ezx)
+#z = range(-crange.Zmax,crange.Zmax,length = Nz)
+#x = range(-crange.Xmax,crange.Xmax,length = Nz)
+p1 = heatmap(Ezx,levels = 200)#,clim = (0,0))#,lim=(0.25,0))
+@show maximum(abs.(F_result[:, :, :]))
+@show maximum(Ezx)
+
+display(p1)
+p2 = plot(Ezx[Int(floor(N.y/2)),:])
+display(p2)
+#    p2 = contourf()
 
