@@ -17,9 +17,9 @@ um = Params.um
 #using FileIO
 # 計算条件###################
 #計算レンジ
-crange = Params.crange(x = 20um, y = 20um, z = 150um, t = 0.1)
+crange = Params.crange(x = 20um, y = 20um, z = 100um, t = 0.1)
 #計算ステップ
-steps = Params.steps(x = 0.2um, y = 0.2um, z = 1um, t = 0.1)
+steps = Params.steps(x = 0.1um, y = 0.1um, z = 1um, t = 0.1)
 Nx = Int(floor(crange.x / steps.x))
 Ny = Int(floor(crange.y / steps.y))
 Nz = Int(floor(crange.z / steps.z))
@@ -27,7 +27,7 @@ Nt = Int(floor(crange.t / steps.t))
 N = Params.N(Nx,Ny,Nz,Nt)
 
 #材料情報
-material = Params.materiarl(nb = 1.54, Δn0 = -0.05, τ = 0.1,α = 0)
+material = Params.materiarl(nb = 1.5, Δn0 = 0.004, τ = 0.1,α = 0)
 mode = Params.gauss_mode(0,0)
 
 #ビーム情報
@@ -138,10 +138,10 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
         # 左貝(7.35)
         imKxR = (1/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
         reKxR = (1im/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j]*exp(-imKxR*steps.y))
-        KxR = reKxR + imKxR
+        KxR = reKxR + 1im* imKxR
 
         if real(KxR) < 0
-            KxR = -reKxR + imKxR      #左貝方式
+            KxR = -reKxR + 1im* imKxR      #左貝方式
         end
 
         ηR = exp( 1im* KxR * steps.x)
@@ -223,11 +223,12 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
         #左貝(7.29)
         imKyU = -(1/steps.y)   * log(F_k_half[i,2]/F_k_half[i,1])
         reKyU = -(1im/steps.y) * log(F_k_half[i,2]/F_k_half[i,1]*exp(imKyU*steps.y))
-        #KxL = -1/(1im * steps.y) * log(F_k_before[1,j]/F_k_before[2,j])
-        KyU = reKyU + imKyU
+        #KxU = -1/(1im * steps.y) * log(F_k_before[1,j]/F_k_before[2,j])
+        KyU = reKyU + 1im* imKyU
 
         if real(KyU) > 0
-            KyU = -reKyU + imKyU
+            KyU = -reKyU + 1im * imKyU
+        #   KyU = -real(Ky)
         end
 
         ηU = exp(1im * KyU * (-steps.y))
@@ -240,14 +241,15 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
         #KyB = -1 / (1im*steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
         imKyB = (1/steps.y)   * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
         reKyB = (1im/steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1]*exp(imKyB*steps.y))
-        KyB = reKyB + imKyB
+        KyB = reKyB + 1im* imKyB
 
         if real(KyB) < 0
             #reKxR = -reKxR      #左貝方式
-            KyB = -reKyB + imKyB           #藪方式
+            KyB = -reKyB + 1im* imKyB           #藪方式
+            #KyB = - real(KyB) + 1im* imag(KyB)
         end
         
-        ηB = exp(1im* reKyB * steps.y)
+        ηB = exp(1im* KyB * steps.y)
         #η = exp(- 1im* KxR * steps.y)
         #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
         
@@ -255,7 +257,6 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
 
         #########################------------------------------------------------------
 
-        
          # 透明境界条件(TBC)を適用したBの係数#######
          d_b(i,j,k) = - 2/steps.x^2 + (matN[i, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
          d_ac = 1/(steps.x)^2
@@ -339,7 +340,7 @@ function main()
     #左辺は更新されたF_k_1stが入る。
     # S
     #初期条件を F_K_1st に入れる。
-    Nref = (material.nb + (material.nb + material.Δn0)) /2
+    Nref = (2material.nb + (material.nb + material.Δn0)) /3
 
     for t in 1:N.t
         @show "Zmax:", N.z
@@ -360,12 +361,12 @@ function main()
     # @show F_result
     println("calc done")
     println("plotting.....") 
-    Ezx = abs.(F_result[Int(floor(N.y/2)),: , :])
+    Ezx = abs.(F_result[Int(floor(N.y/2)+1),: , :])
 #  @show Ezx
     @show typeof(Ezx)
     #z = range(-crange.Zmax,crange.Zmax,length = Nz)
     #x = range(-crange.Xmax,crange.Xmax,length = Nz)
-    p1 = contourf(Ezx,levels = 200,clim = (0,0.75))#,lim=(0.25,0))
+    p1 = heatmap(Ezx,levels = 200)#,clim = (0,0))#,lim=(0.25,0))
     @show maximum(abs.(F_result[:, :, :]))
     @show maximum(Ezx)
     display(p1)
@@ -377,4 +378,5 @@ function main()
 end
 
 @time main()
+
 
