@@ -27,11 +27,11 @@ Nt = Int(floor(crange.t / steps.t))
 N = Params.N(Nx,Ny,Nz,Nt)
 
 #材料情報
-material = Params.materiarl(nb = 1.54, Δn0 = -0.2, τ = 0.1,α = 0)
+material = Params.materiarl(nb = 1.54, Δn0 = -0.05, τ = 0.1,α = 0)
 mode = Params.gauss_mode(0,0)
 
 #ビーム情報
-beam = Params.beam(w = 5um, U0 = 1, wavelength = 1.064um)
+beam = Params.beam(w = 2um, U0 = 1, wavelength = 1.064um)
 
 println("計算環境")
 #versioninfo()
@@ -125,10 +125,9 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
         #左貝(7.29)
         imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
         reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
-        @show reKxL
-        @show imKxL
+
         KxL = reKxL + imKxL
-        if real(KxL) < 0
+        if real(KxL) > 0
             KxL = -reKxL + imKxL
         end
 
@@ -141,7 +140,7 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
         reKxR = (1im/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j]*exp(-imKxR*steps.y))
         KxR = reKxR + imKxR
 
-        if real(KxR) > 0
+        if real(KxR) < 0
             KxR = -reKxR + imKxR      #左貝方式
         end
 
@@ -226,29 +225,29 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
         reKyU = -(1im/steps.y) * log(F_k_half[i,2]/F_k_half[i,1]*exp(imKyU*steps.y))
         #KxL = -1/(1im * steps.y) * log(F_k_before[1,j]/F_k_before[2,j])
         KyU = reKyU + imKyU
-        # real つけなくてもいいはずだが、
-        # 
+
         if real(KyU) > 0
             KyU = -reKyU + imKyU
         end
 
         ηU = exp(1im * KyU * (-steps.y))
-        A[1,1] += ηU/ay
+        A[1,1] += ηU*ay
         ##!!!!!
 
 
         #下端---------------------
         #左貝7.35
         #KyB = -1 / (1im*steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
-        imKyB = -(1/steps.y)   * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
-        reKyB = -(1im/steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1]*exp(imKyB*steps.y))
+        imKyB = (1/steps.y)   * log(F_k_half[i,N.y]/F_k_half[i,N.y-1])
+        reKyB = (1im/steps.y) * log(F_k_half[i,N.y]/F_k_half[i,N.y-1]*exp(imKyB*steps.y))
         KyB = reKyB + imKyB
+
         if real(KyB) < 0
             #reKxR = -reKxR      #左貝方式
             KyB = -reKyB + imKyB           #藪方式
         end
         
-        ηB = exp(-1im* reKyB * steps.y)
+        ηB = exp(1im* reKyB * steps.y)
         #η = exp(- 1im* KxR * steps.y)
         #ηR = 1/exp(1im* reKxR * steps.y - imKxR*steps.x)
         
@@ -257,32 +256,28 @@ function calcStep2!(F_k_half, F_k_next, k, matN,Nref)
         #########################------------------------------------------------------
 
         
-        # 透明境界条件(TBC) for B#######
-        colBL = (2-ηU)/steps.y^2 - (matN[i,1,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-        colBR = (2-ηB)/steps.y^2 - (matN[i,N.y,k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
-        colC = -1/(steps.x)^2
+         # 透明境界条件(TBC)を適用したBの係数#######
+         d_b(i,j,k) = - 2/steps.x^2 + (matN[i, j, k]^2-Nref^2)*k0^2 + (4im*Nref*k0)/steps.z
+         d_ac = 1/(steps.x)^2
 
         #@show F_k_before
 
         for j in 1:N.y
             if i == 1
-                B[j] = -conj(colBL)*F_k_half[1,j] - colC*F_k_half[2,j]
+                B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i+1,j] #+ ηU？
             elseif i == N.x
-                B[j] = -conj(colBR)*F_k_half[N.x,j] - colC*F_k_half[N.x-1,j]
+                B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i-1,j] #+ ηB？
             else
-                #B[j] = c*F_k_before[i,j] + d(i,j,k)*F_k_before[i-1,j] + d(i,j,k)* F_k_before[i+1,j]
-                B[j] = ax*F_k_half[i,j] + b(i,j,k) *F_k_half[i,j] + cx*F_k_half[i,j]
+                B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i-1,j] + d_ac*F_k_half[i+1,j]    
             end
         end
 
-        
         #########################
 
-        F_k_next[i,:] = B\A
+        F_k_next[i,:] = A \ B
         #F_k_after[]を使って、新しい屈折率マップを作る。
 
     end
-    return F_k_next
 end
 
 function retN()
@@ -336,7 +331,7 @@ function main()
     F_k_1st = E
     p = contour(real.(E),levels = 200)
     display((p))
-    setNwaveguide!(matN, steps.x, steps.y, steps.z, 5um, 0, material.nb, material.nb + material.Δn0, 0.5)
+    setNwaveguide!(matN, steps.x, steps.y, steps.z, 4um, 0, material.nb, material.nb + material.Δn0, 0.5)
     #@show matN
     p = contourf(matN[:,Int(floor(N.y)/2),:])
     display((p))
@@ -357,6 +352,8 @@ function main()
             calcStep2!(F_k_half, F_k_2nd, k, matN, Nref)
             F_k_1st = F_k_2nd
             F_result[:,:,k] = F_k_2nd
+            F_k_2nd = zeros(ComplexF64,Nx,Ny)
+            F_k_half = zeros(ComplexF64,Nx,Ny)
         end
     #    @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
     end
@@ -366,7 +363,9 @@ function main()
     Ezx = abs.(F_result[Int(floor(N.y/2)),: , :])
 #  @show Ezx
     @show typeof(Ezx)
-    p1 = contourf(Ezx,levels = 200,clim = (0,maximum(Ezx)/10))#,lim=(0.25,0))
+    #z = range(-crange.Zmax,crange.Zmax,length = Nz)
+    #x = range(-crange.Xmax,crange.Xmax,length = Nz)
+    p1 = contourf(Ezx,levels = 200,clim = (0,0.75))#,lim=(0.25,0))
     @show maximum(abs.(F_result[:, :, :]))
     @show maximum(Ezx)
     display(p1)
