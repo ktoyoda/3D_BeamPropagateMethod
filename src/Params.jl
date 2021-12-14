@@ -46,27 +46,45 @@ module Params
         z::Int64
         t::Int64
     end
-    @with_kw struct materiarl
+    @with_kw struct material
         nb::Float64 =1.5    # 背景屈折率
         Δn0::Float64 = 0.03 # 外場入力時の屈折率変化
         τ::Float64 = 0.1    # 遅延時間
         α::Float64 = 0.0    # 吸収率
+        U::Float64 = 0.1   # Critical Exposure 
     end
     @with_kw struct beam
         w::Float64 = 3um
         U0::Float64 = 100.0
         wavelength::Float64 = 1.06um
     end
-    @with_kw struct gauss_mode
-        m::Int8 = 0
-        n::Int8 = 0
+
+    @with_kw struct propagate
+        τ::Float64 = 0.1
+        Uᵩ::Float64 = 1
     end
-    @with_kw struct vortex_mode
-        # userはl,pで代入するが、
-        # m,nのフィールドも持っておき、コードライティング中では、m,nでやらせる。
-        l::Int8 = 1
-        p::Int8 = 0
-        m = l
-        n = p
+
+    function range_x(ran::crange,step::steps)
+        return range(-ran.x, ran.x, step = steps.x)
     end
+
+    function range_y(ran::crange,step::steps)
+        return range(-ran.y, ran.y, step = steps.y)
+    end
+
+    function range_z(ran::crange,step::steps)
+        return range(-ran.z, ran.z, step = steps.z)
+    end
+
 end
+struct gauss_mode
+    m::Int8
+    n::Int8
+end
+struct vortex_mode
+    # userはl,pで代入するが、
+    # m,nのフィールドも持っておき、コードライティング中では、m,nでやらせる。
+    l::Int8
+    p::Int8
+end
+
