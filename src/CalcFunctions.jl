@@ -41,10 +41,8 @@ end
 # Step1,Step2の組み合わせを複数回周回することになる。
 # t = n に関しては、
 # 上記で作った新しい屈折率マップをもとに、
-# 再度回していく。 	\1/2 
+# 再度回していく。
 
-# テキスト中nr と nについて
-# 
 
 #ADIの未知数X方向 定数Y方向 差分
 function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
@@ -63,7 +61,6 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
     B = zeros(ComplexF64,N.x,1)
 
     for j in 1:N.y
-        #! jに関して透明境界条件必要じゃないんか？
         #! 左貝146Pにφ₀ʳ≒φ₁ʳ*ηLで近似できると書いてあった。
         # Ax=BのA (z = k+1 における係数行列)を作る。
         # mapでベクトルを作っておいて、diagmで対角行列にする。
@@ -78,11 +75,6 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
         #左端 ηLを作成する。---------------------
         #左貝(7.29)
-        #=
-        imKxL = -(1/steps.x)   * log(F_k_before[2,j]/F_k_before[1,j])
-        reKxL = -(1im/steps.x) * log(F_k_before[2,j]/F_k_before[1,j]*exp(imKxL*steps.x))
-        KxL = reKxL + imKxL
-        =#
         KxL = -(1/(1im*steps.x))   * log(F_k_before[1,j]/F_k_before[2,j])
 
         if real(KxL) < 0
@@ -95,11 +87,6 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
 
         #右端 ηRを作成する。---------------------
         # 左貝(7.35)
-        #=
-        imKxR = (1/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
-        reKxR = (1im/steps.x) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j]*exp(-imKxR*steps.y))
-        KxR = reKxR + 1im* imKxR
-        =#
         KxR = (-1/(1im*steps.x)) * log(F_k_before[N.x, j]/F_k_before[N.x-1, j])
         if real(KxR) > 0
             KxR = -real(KxR) + 1im* imag(KxR)      #左貝方式
@@ -169,27 +156,8 @@ function calcStep2!(F_k_half, F_k_next, k, matN, Nref)
         
         #透明境界条件(TBC) for A#######--------------------------------------------------
         # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
-        #左端---------------------
-        # 藪107p
-        #= ```
-        KxL = -1 / (1im*steps.y) * log(F_k_half[i,1]/F_k_half[i,2])
-        if real(KxL)<0
-            KxL = imag(KxL)
-        end
-
-        ηL = exp(1im*KxL*(-steps.y))
-        A[1,1] += ηL*ax
-        ```
-        =# 
-        #透明境界条件(TBC) for A#######
-        # 参考文献  左貝潤一 光導波路の電磁界解析 p.145
         #上端---------------------
-        #左貝(7.29)
-        #=
-        imKyU = -(1/steps.y)   * log(F_k_half[i,2]/F_k_half[i,1])
-        reKyU = -(1im/steps.y) * log(F_k_half[i,2]/F_k_half[i,1]*exp(imKyU*steps.y))
-        KyU = reKyU + 1im* imKyU
-        =#
+
         KyU = -(1/(1im*steps.y))   * log(F_k_half[i,1]/F_k_half[i,2])
         if real(KyU) < 0
         #    KyU = -reKyU + 1im * imKyU
@@ -248,32 +216,18 @@ function showMode()
 end
 
 # 多重ディスパッチでvortexかgaussかを切り替える
+# KTOptical 側で多重ディスパッチを追加したので、
+# mode のtypeによって関数が異なる。
 # 電界の初期条件
-function initial_set(Mode::vortex_mode, Beamparam ,F0)
+function initial_set(mode, Beamparam,F0)
     KTOptical.setParam(Beamparam.w, 0, Beamparam.wavelength)
 
     x = range(-crange.x/2, crange.x/2 - steps.x, length = N.x)
     y = range(-crange.y/2, crange.y/2 - steps.y ,length = N.y)
 
-    #ここをLG_E HG_Eののなんかラッパ的な奴にできない？
-    E = LG_E.(Mode.l, Mode.p, x, y')
-    #plot()
-    return E
+    #Refはブロードキャスト時にスカラとして渡したいときに使う。
+    return KTOptical.E.(Ref(mode), x, y')
 end
-
-# 電界の初期条件
-function initial_set(Mode::gauss_mode, Beamparam ,F0)
-    KTOptical.setParam(Beamparam.w, 0, Beamparam.wavelength)
-
-    x = range(-crange.x/2, crange.x/2 - steps.x, length = N.x)
-    y = range(-crange.y/2, crange.y/2 - steps.y ,length = N.y)
-
-    #ここをLG_E HG_Eののなんかラッパ的な奴にできない？
-    E = HG_E.(Mode.m, Mode.n, x, y')
-    #plot()
-    return E
-end
-
 
 function renewN!(matN, E3d)
 end

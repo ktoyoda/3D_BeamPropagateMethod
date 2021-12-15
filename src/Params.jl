@@ -77,14 +77,5 @@ module Params
     end
 
 end
-struct gauss_mode
-    m::Int8
-    n::Int8
-end
-struct vortex_mode
-    # userはl,pで代入するが、
-    # m,nのフィールドも持っておき、コードライティング中では、m,nでやらせる。
-    l::Int8
-    p::Int8
-end
+
 

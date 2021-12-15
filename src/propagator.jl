@@ -17,17 +17,17 @@ Uᵩ は 反応開始閾値
 function IntensityTodN!(Iintegral, Et, E, mat, t_now::Float64, step)
     xy_square = step.x * step.y
     I = abs2(E)
-    if I / xy_square > mat.U # 面積強度が臨海強度を超えたなら
+    if I  > mat.U # 面積強度が臨海強度を超えたなら
         if !(Et == 0)
             Et = t_now # 臨海強度を超えた時の時間を記録
         end  
     end
     # 積算
-    if Et + τ > t_now
+    if Et + mat.τ > t_now
         Iintegral += I
     end
 
-    return mat.Δn0(1-exp(-1/mat.U*Iintegral))
+    return mat.Δn0*(1-exp(-1/mat.U*Iintegral))
 end
 
 function setNwaveguide!(N::Array{Float64,3},xstep, ystep, zstep, diameter, angle,baseN , propN, starting_separate)
@@ -57,9 +57,6 @@ function setNwaveguide!(N::Array{Float64,3},xstep, ystep, zstep, diameter, angle
                     #if (x_pos-angle*x_pos)
                 #end
             end
-
         end
     end
-
-
 end
