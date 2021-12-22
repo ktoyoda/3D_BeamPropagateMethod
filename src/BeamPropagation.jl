@@ -21,7 +21,7 @@ um = Params.um
 #計算レンジ
 crange = Params.crange(x = 50um, y = 50um, z = 1000um, t = 2)
 #計算ステップ
-steps = Params.steps(x = 0.5um, y = 0.5um, z = 1um, t = 0.1)
+steps = Params.steps(x = 1um, y = 1um, z = 1um, t = 0.1)
 Nx = Int(floor(crange.x / steps.x))
 Ny = Int(floor(crange.y / steps.y))
 Nz = Int(floor(crange.z / steps.z))
@@ -78,7 +78,7 @@ function main()
     F_k_1st = E
     #setNwaveguide!(matN, steps.x, steps.y, steps.z, 20um, 0, mtr.nb, mtr.nb+mtr.Δn0, 0.5)
 
-    Nref = (2mtr.nb + (mtr.nb + mtr.Δn0)) /3
+    Nref = mtr.nb
 
     for t in 1:N.t
         @show "Zmax:", N.z
@@ -97,10 +97,16 @@ function main()
         #!! ブロードキャストしたくない 引数があった場合はどうすればよいのだろう
         #!!!!→ スカラとして渡したい引数にRefを付ける！
         matN .+= IntensityTodN!.(Iintegral, Et, F_result, Ref(mtr), Ref(t*steps.t) , Ref(steps))
+        # 常にインプットされるのでEをF_k_1stにいれる
+        F_k_1st = E
     #    @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
         Ezx = abs.(F_result[Int(floor(N.y/2)-1),: , :])
         p1 = heatmap(z,x,Ezx,levels = 200)
         display(p1)
+        p3 = heatmap(-crange.x:steps.x:crange.x, -crange.z:steps.z:crange.z,
+            matN, levels = 200)#,clim = (0,0))#,lim=(0.25,0))
+        @show size(F_result)
+        display(p3)
     end
     return F_result
 
