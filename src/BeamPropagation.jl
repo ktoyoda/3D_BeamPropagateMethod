@@ -21,22 +21,27 @@ um = Params.um
 #計算レンジ
 crange = Params.crange(x = 50um, y = 50um, z = 1000um, t = 2)
 #計算ステップ
-steps = Params.steps(x = 1um, y = 1um, z = 1um, t = 0.1)
+#steps = Params.steps(x = 0.2um, y = 0.2um, z = 0.5um, t = 0.1)
+steps = Params.steps(x = 1um, y = 1um, z = 2um, t = 0.1)
 Nx = Int(floor(crange.x / steps.x))
 Ny = Int(floor(crange.y / steps.y))
 Nz = Int(floor(crange.z / steps.z))
 Nt = Int(floor(crange.t / steps.t))
 N = Params.N(Nx,Ny,Nz,Nt)
+# 初期で作られる屈折率の強度依存分布と、伝搬でできる屈折率分布の比
+ratio = 0.02
+# smoothing range
+smooth_range = 5
 
 #材料情報
 #Δn0は0.01以下にとらないと発散する。これを防ぐにはパでを使うしかない
-mtr = Params.material(nb = 1.5, Δn0 = -0.01, τ = 0.1, α = 0, U = 1.5)
+mtr = Params.material(nb = 1.5, Δn0 = -0.1, τ = 0, α = 0, U = 0.1)
 
 #ビーム情報
 # ガウスモードならgauss_mode(0,0)
 # LGモードならvortex_mode(1,0)
 mode = vortex_mode(1,0)
-beam = Params.beam(w = 10um , U0 = 1, wavelength = 1.064um)
+beam = Params.beam(w = 10um , U0 = 1, wavelength = 0.256um)
 
 println("計算環境")
 #versioninfo()
@@ -50,7 +55,7 @@ println("計算条件")
 @show mode
 @show beam
 
-function main()
+@time function main()
     #セル個数
     F0 = zeros(N.x, N.y, N.z)
 #    @show size(F0)
@@ -59,10 +64,10 @@ function main()
     #!!!!!!!!!!!!!!!!!!!!!!!!
     x = range(-crange.x/2, crange.x/2 ,length = N.x)
     y = range(-crange.y/2, crange.y/2 ,length = N.y)
-    z = range(-crange.z/2, crange.z/2 ,length = N.z)
-
+    z = range(0, crange.z ,length = N.z)
+    @show x,length(x)
     F_result = zeros(ComplexF64,(N.x,N.y,N.z))
-    Iintegral = zeros(ComplexF64,(N.x,N.y,N.z))
+    Iintegral = zeros(Float64,(N.x,N.y,N.z))
     Et = zeros(Float64,(N.x,N.y,N.z))
     #F_k_1stは現在のF_k
     #F_k_2ndは更新されたF_k
@@ -76,16 +81,25 @@ function main()
     @show typeof(E)
     @show size(F_k_1st)
     F_k_1st = E
-    #setNwaveguide!(matN, steps.x, steps.y, steps.z, 20um, 0, mtr.nb, mtr.nb+mtr.Δn0, 0.5)
-
+    #ratioを大きくしすぎるとエラー！
+    setNwaveguide!(matN, mode, ratio, steps.x, steps.y, steps.z, mtr.nb, mtr.Δn0)
+    matNzx = matN[Int(floor(N.y/2)-1),: , :]
+    if mtr.Δn0 >0
+        cl = (mtr.nb, mtr.nb+mtr.Δn0)
+    else
+        cl = (mtr.nb + mtr.Δn0 ,mtr.nb)
+    end
+    p = heatmap(z*10^3, x*10^6, matNzx, levels = 200, clim=cl)
+    display(p)
     Nref = mtr.nb
 
     for t in 1:N.t
         @show "Zmax:", N.z
         for k in 1:N.z
-            if k%10 ==0
+            if k%100 ==0
                 @show "z", k,"/",N.z,"t",t, "/", N.t
                 @show findmax(abs2.(F_result))
+                @show  abs2.(F_result[N.x÷2,N.y÷2,N.z÷2])
             end
             # y 固定、　x方向移動
             calcStep1!(F_k_1st, F_k_half, k, matN, Nref)
@@ -96,20 +110,26 @@ function main()
         end
         #!! ブロードキャストしたくない 引数があった場合はどうすればよいのだろう
         #!!!!→ スカラとして渡したい引数にRefを付ける！
-        matN .+= IntensityTodN!.(Iintegral, Et, F_result, Ref(mtr), Ref(t*steps.t) , Ref(steps))
+        matN= matN + IntensityTodN!.(Iintegral, Et, F_result, Ref(mtr), Ref(t*steps.t) , Ref(steps),Ref(ratio))
+        matN = Smoothing(matN,x,y,z,5)
         # 常にインプットされるのでEをF_k_1stにいれる
         F_k_1st = E
     #    @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
-        Ezx = abs.(F_result[Int(floor(N.y/2)-1),: , :])
-        p1 = heatmap(z,x,Ezx,levels = 200)
+        Ezx = abs.(F_result[Int(floor(N.y/2)-1), :, :])
+        @show size(Ezx)
+        matNzx = matN[Int(floor(N.y/2)-1), :, :]
+        middle_intensity = abs2.(F_result[N.x÷2,N.y÷2,N.z÷2])
+        p1 = heatmap(z*10^3, x*10^6, Ezx[:, :],levels = 200,clim = (0,middle_intensity))
         display(p1)
-        p3 = heatmap(-crange.x:steps.x:crange.x, -crange.z:steps.z:crange.z,
-            matN, levels = 200)#,clim = (0,0))#,lim=(0.25,0))
-        @show size(F_result)
+        if mtr.Δn0 >0
+            cl = (mtr.nb, mtr.nb+mtr.Δn0)
+        else
+            cl = (mtr.nb + mtr.Δn0 ,mtr.nb)
+        end
+        p3 = heatmap(z*10^3, x*10^6, matNzx, levels = 200, clim=cl)
         display(p3)
     end
     return F_result
-
 end
 
 @time F_result = main()

@@ -1,6 +1,5 @@
 
-a = zeros(Int32,5,5)
-b = ones(Int32,5,1)
-@show a
-a[5,:] = b
+a = 5 /
+2
+a,b,c = 4,4,4
 @show a
