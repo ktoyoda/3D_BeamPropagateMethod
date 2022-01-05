@@ -19,9 +19,10 @@ um = Params.um
 #using FileIO
 # 計算条件###################
 #計算レンジ
-crange = Params.crange(x = 40um, y = 40um, z = 800um, t = 2)
+crange = Params.crange(x = 50um, y = 50um, z = 800um, t = 2)
 #計算ステップ
 steps = Params.steps(x = 0.5um, y = 0.5um, z = 0.5um, t = 0.1)
+
 #steps = Params.steps(x = 1um, y = 1um, z = 2um, t = 0.1)
 Nx = Int(floor(crange.x / steps.x))
 Ny = Int(floor(crange.y / steps.y))
@@ -41,7 +42,7 @@ mtr = Params.material(nb = 1.5, Δn0 = -0.1, τ = 0, α = 0, U = 0.1)
 # ガウスモードならgauss_mode(0,0)
 # LGモードならvortex_mode(1,0)
 mode = vortex_mode(1,0)
-beam = Params.beam(w = 10um , U0 = 1, wavelength = 0.532um)
+beam = Params.beam(w = 20um , U0 = 1, wavelength = 0.532um)
 
 println("計算環境")
 #versioninfo()
@@ -64,7 +65,7 @@ println("計算条件")
     #!!!!!!!!!!!!!!!!!!!!!!!!
     x = range(-crange.x/2, crange.x/2 ,length = N.x)
     y = range(-crange.y/2, crange.y/2 ,length = N.y)
-    z = range(0, crange.z,length = N.z)
+    z = range(0, crange.z ,length = N.z)
     @show x,length(x)
     F_result = zeros(ComplexF64,(N.x,N.y,N.z))
     Iintegral = zeros(Float64,(N.x,N.y,N.z))
@@ -109,7 +110,17 @@ println("計算条件")
             F_result[:,:,k] = F_k_2nd
         end
 
-
+        KyZ_array = (-1/(1im*steps.z)) * log.(F_result[:,:,N.z] ./ F_result[:,:,N.z-1]) 
+        F_result[:,:,N.z] = map(KyZ_array) do p
+            if real(p) < 0
+                return p = -real(p) + 1im*(imag(p))
+            else
+                return p = real(p) - 1im*(imag(p))
+            end
+        end
+            
+        
+        
 
         #!! ブロードキャストしたくない 引数があった場合はどうすればよいのだろう
         #!!!!→ スカラとして渡したい引数にRefを付ける！
