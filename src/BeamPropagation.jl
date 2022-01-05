@@ -64,7 +64,7 @@ println("計算条件")
     #!!!!!!!!!!!!!!!!!!!!!!!!
     x = range(-crange.x/2, crange.x/2 ,length = N.x)
     y = range(-crange.y/2, crange.y/2 ,length = N.y)
-    z = range(0, crange.z+steps.z ,length = N.z+1)
+    z = range(0, crange.z,length = N.z)
     @show x,length(x)
     F_result = zeros(ComplexF64,(N.x,N.y,N.z))
     Iintegral = zeros(Float64,(N.x,N.y,N.z))
@@ -108,7 +108,7 @@ println("計算条件")
             F_k_1st = F_k_2nd
             F_result[:,:,k] = F_k_2nd
         end
-        
+
 
 
         #!! ブロードキャストしたくない 引数があった場合はどうすればよいのだろう
