@@ -107,10 +107,20 @@ function calcStep1!(F_k_before, F_k_half, k, matN, Nref)
         for i in 1:N.x
             if j == 1
                 K_temp = (-1/(1im*steps.y))   * log(F_k_before[i,1] / F_k_before[i,2])
+                
+                if real(K_temp) < 0
+                    K_temp =  -real(K_temp) + 1im * imag(K_temp)
+                end
+                
                 F0 = F_k_before[i,1] * exp(1im * K_temp*(-steps.y))
                 B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j+1] +d_ac*F0 #+ ηU？
             elseif j == Ny
                 K_temp = (-1/(1im*steps.y))   * log(F_k_before[i,Ny] / F_k_before[i,Ny-1])
+
+                if real(K_temp) > 0
+                    K_temp =  -real(K_temp) + 1im * imag(K_temp)
+                end
+                
                 F0 = F_k_before[i,Ny] * exp(1im * K_temp*(-steps.y))
                 B[i] = d_b(i,j,k) * F_k_before[i,j] + d_ac * F_k_before[i,j-1] +d_ac * F0#+ ηB？
             else
@@ -188,14 +198,23 @@ function calcStep2!(F_k_half, F_k_next, k, matN, Nref)
         for j in 1:N.y
             if i == 1
                 K_temp = (-1/(1im*steps.x))   * log(F_k_half[1,j] / F_k_half[2,j])
+                if real(K_temp) < 0
+                    K_temp =  -real(K_temp) + 1im * imag(K_temp)
+                end
+                
                 F0 = F_k_half[1,j] * exp(1im * K_temp*(-steps.x))
                 B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i+1,j] + d_ac*F0
 
             elseif i == N.x
                 K_temp = (-1/(1im*steps.x))   * log(F_k_half[Nx,j] / F_k_half[Nx-1,j])
+                
+                if real(K_temp) > 0
+                    K_temp =  -real(K_temp) + 1im * imag(K_temp)
+                end
+
                 F0 = F_k_half[Nx,j] * exp(1im * K_temp*(-steps.x))
                 B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i-1,j] + d_ac*F0 
-
+                
             else
                 B[j] = d_b(i,j,k) * F_k_half[i,j] + d_ac * F_k_half[i-1,j] + d_ac*F_k_half[i+1,j]    
             end
