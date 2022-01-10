@@ -14,14 +14,16 @@ using KTOptical
 using BenchmarkTools
 using JLD2
 using Polynomials
+
 um = Params.um
 
 #using FileIO
 # 計算条件###################
 #計算レンジ
-crange = Params.crange(x = 200um, y = 200um, z = 800um, t = 2)
+crange = Params.crange(x = 200um, y = 200um, z = 800um, t = 10)
 #計算ステップ
-steps = Params.steps(x =2um, y = 2um, z = 0.5um, t = 0.1)
+steps = Params.steps(x =2um, y = 2um, z = 0.5um, t = 1)
+#steps = Params.steps(x =5um, y = 5um, z = 5um, t = 1)
 
 #steps = Params.steps(x = 1um, y = 1um, z = 1um, t = 0.1)
 Nx = Int(floor(crange.x / steps.x))
@@ -36,13 +38,13 @@ smooth_range = 5
 
 #材料情報
 #Δn0は0.01以下にとらないと発散する。これを防ぐにはパでを使うしかない
-mtr = Params.material(nb = 1.5, Δn0 = -0.1, τ = 0, α = 0, U = 0.05)
+mtr = Params.material(nb = 1.5, Δn0 = -0.02, τ = 0, α = 0, U = 1.5)
 
 #ビーム情報
 # ガウスモードならgauss_mode(0,0)
 # LGモードならvortex_mode(1,0)
 mode = vortex_mode(1,0)
-beam = Params.beam(w = 15um , U0 = 1, wavelength = 1.064um)
+beam = Params.beam(w = 10um , U0 = 0.5, wavelength = 0.532um)
 
 println("計算環境")
 #versioninfo()
@@ -50,13 +52,16 @@ Pkg.status()
 
 println("計算条件")
 @show crange
-@show steps
+@show steps 
 @show N
 @show mtr
 @show mode
 @show beam
+@show ratio
 
 @time function main()
+
+
     #セル個数
     F0 = zeros(N.x, N.y, N.z)
 #    @show size(F0)
@@ -83,7 +88,7 @@ println("計算条件")
     @show size(F_k_1st)
     F_k_1st = E
     #ratioを大きくしすぎるとエラー！
-    setNwaveguide!(matN, mode, ratio, steps.x, steps.y, steps.z, mtr.nb, mtr.Δn0)
+    setNwaveguide!(matN, mode, ratio, steps.x, steps.y, steps.z, mtr.nb, mtr.Δn0, beam)
     matNzx = matN[Int(floor(N.y/2)-1),: , :]
     if mtr.Δn0 >0
         cl = (mtr.nb, mtr.nb+mtr.Δn0)
@@ -93,7 +98,8 @@ println("計算条件")
     p = heatmap(z*10^3, x*10^6, matNzx, levels = 200, clim=cl)
     display(p)
     Nref = mtr.nb
-
+    
+        
     for t in 1:N.t
         @show "Zmax:", N.z
         F_k_1st = E
@@ -103,7 +109,8 @@ println("計算条件")
             if k%100 ==0
                 @show "z", k,"/",N.z,"t",t, "/", N.t
                 @show findmax(abs2.(F_result))
-                @show  abs2.(F_result[N.x÷2,N.y÷2,N.z÷2])
+                @show abs2.(F_result[N.x÷2,N.y÷2,N.z÷2])
+                @show minimum(matN)
             end
             # y 固定、　x方向移動
             calcStep1!(F_k_1st, F_k_half, k, matN, Nref)
@@ -121,22 +128,28 @@ println("計算条件")
         # 常にインプットされるのでEをF_k_1stにいれる
 
     #    @save "/savefile/F_"* string(t)*".jld2" F_k_2nd
-        Ezx = abs.(F_result[:, Int(floor(N.y/2)-1), :])
+        Ezx2 = view(F_result,:, Int(floor(N.y/2)-1), :)
+        Ezx = abs.(Ezx2)
         @show size(Ezx)
-        matNzx = matN[:, Int(floor(N.y/2)-1), :]
-        middle_intensity = abs2.(F_result[N.x÷2,N.y÷2,N.z÷2])
-        p1 = heatmap(z*10^3, x*10^6, Ezx[:, :],levels = 200,clim=(0,3),xlabel = "Z [mm]", ylabel = "X [μm]" )
+        matNzx = view(matN,:, Int(floor(N.y/2)-1), :)
+        p1 = heatmap(z*10^3, x*10^6, Ezx,levels = 200,clim=(0,3),xlabel = "Z [mm]", ylabel = "X [μm]" )
         strt = string(t)
-        savefig(p1, strt*"_Intensity.png")
+        savefig(p1, strt*"_In.png")
         display(p1)
         if mtr.Δn0 >0
             cl = (mtr.nb, mtr.nb+mtr.Δn0)
         else
             cl = (mtr.nb + mtr.Δn0 ,mtr.nb)
         end
-        p3 = heatmap(z*10^3, x*10^6, matNzx, levels = 200, clim=(1.48,1.5),xlabel = "Z [mm]", ylabel = "X [μm]")
+        p3 = heatmap(z*10^3, x*10^6, matNzx, levels = 200, clim=(1.40,1.5),xlabel = "Z [mm]", ylabel = "X [μm]")
         savefig(p3, strt*"_ri.png")
         display(p3)
+        jldopen("xyz1105um_1s_"*strt*"_E.jld2","a+") do file1
+            file1[strt*"/E"] = abs.(F_result)
+        end
+        jldopen("xyz1105um_1s_"*strt*"_N.jld2","a+") do file2
+            file2[strt*"/N"] = matN
+        end
     end
     return F_result
 end
@@ -144,19 +157,4 @@ end
 @time F_result = main()
 
 
-
-#=
-@show maximum(abs.(F_result[:, :, :]))
-@show maximum(Ezx)
-
-display(p1)
-
-Ezy = abs.(F_result[: , Int(floor(N.y/2)-1),:])
-p3 = heatmap(-crange.x:steps.x:crange.x, -crange.z:steps.z:crange.z,
-            Ezy,levels = 200)#,clim = (0,0))#,lim=(0.25,0))
-@show size(F_result)
-display(p3)
-
-p2 = plot(Ezx[Int(floor(N.y/2)),:])
-display(p2)
 =#

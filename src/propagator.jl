@@ -32,6 +32,12 @@ function IntensityTodN(Iintegral, Et, E, mat, t_now::Float64, step,ratio)
     if Iintegral == NaN
         Iintegral = 0
     end
+    if mat.Δn0*(1-ratio)*(1-exp((-1/mat.U)*Iintegral)) == NaN
+        @show mat.Δn0
+        @show ratio
+        @show mat.U
+        @show Iintegral
+    end
     return mat.Δn0*(1-ratio)*(1-exp((-1/mat.U)*Iintegral))
 end
 
@@ -112,7 +118,7 @@ end
 
 
 # 第二引数にモード(mode)を取る。モードのIntensityに相当した屈折率分布を与える。ピークの屈折率をratio * I(peak) にする
-function setNwaveguide!(N::Array{Float64,3},mode, ratio, xstep, ystep, zstep, baseN , deltaN)
+function setNwaveguide!(N::Array{Float64,3},mode, ratio, xstep, ystep, zstep, baseN , deltaN, Beam)
 
 
     Nx = size(N,1)
@@ -129,7 +135,7 @@ function setNwaveguide!(N::Array{Float64,3},mode, ratio, xstep, ystep, zstep, ba
     Intensity = KTOptical.I.(Ref(mode),xrange,yrange')
 
     max_I = maximum(Intensity)
-    Intensity = Intensity / max_I
+    Intensity = Intensity / max_I * Beam.U0
     @show maximum(Intensity)
     for (i,x_pos) in enumerate(xrange)
         for (j,y_pos) in enumerate(yrange)
