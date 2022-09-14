@@ -20,10 +20,10 @@ um = Params.um
 #using FileIO
 # 計算条件###################
 #計算レンジ
-crange = Params.crange(x = 200um, y = 200um, z = 800um, t = 10)
+crange = Params.crange(x = 200um, y = 200um, z = 800um, t = 1)
 #計算ステップ
-steps = Params.steps(x =2um, y = 2um, z = 0.5um, t = 1)
-#steps = Params.steps(x =5um, y = 5um, z = 5um, t = 1)
+#steps = Params.steps(x =1um, y = 1um, z = 0.5um, t = 1)
+steps = Params.steps(x =5um, y = 5um, z = 5um, t = 1)
 
 #steps = Params.steps(x = 1um, y = 1um, z = 1um, t = 0.1)
 Nx = Int(floor(crange.x / steps.x))
@@ -32,19 +32,19 @@ Nz = Int(floor(crange.z / steps.z))
 Nt = Int(floor(crange.t / steps.t))
 N = Params.N(Nx,Ny,Nz,Nt)
 # 初期で作られる屈折率の強度依存分布と、伝搬でできる屈折率分布の比
-ratio = 0.05
+ratio = 0.001
 # smoothing range
-smooth_range = 5
+smooth_range = 1
 
 #材料情報
 #Δn0は0.01以下にとらないと発散する。これを防ぐにはパでを使うしかない
-mtr = Params.material(nb = 1.5, Δn0 = -0.02, τ = 0, α = 0, U = 1.5)
+mtr = Params.material(nb = 1.5, Δn0 = -0.01, τ = 0, α = 0, U = 1)
 
 #ビーム情報
 # ガウスモードならgauss_mode(0,0)
 # LGモードならvortex_mode(1,0)
 mode = vortex_mode(1,0)
-beam = Params.beam(w = 10um , U0 = 0.5, wavelength = 0.532um)
+beam = Params.beam(w = 25um , U0 = 1, wavelength = 0.532um)
 
 println("計算環境")
 #versioninfo()
@@ -156,5 +156,3 @@ end
 
 @time F_result = main()
 
-
-=#
